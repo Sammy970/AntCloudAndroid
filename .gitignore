@@ -44,3 +44,4 @@ app/.externalNativeBuild/
 .cxx/
 # AntCloud
 local.properties
+dist/

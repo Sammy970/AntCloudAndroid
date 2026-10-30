@@ -92,6 +92,7 @@ class AntCloudActivity : ComponentActivity() {
         }
         if ("notice" in parts) AppState.session.showNotice("Servers at Capacity", "All servers are currently busy. Please wait 5–10 minutes and try again.")
         if ("upstream" in parts) UpstreamStatus.preview(0.017, null)
+        if ("network" in parts) AppState.network.preview()
     }
 }
 

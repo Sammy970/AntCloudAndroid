@@ -59,6 +59,15 @@ class NetworkCheck {
     private val _result = MutableStateFlow(Result())
     val result: StateFlow<Result> = _result
 
+    /**
+     * Screenshot mode: shows a finished test with sample results (the emulator's virtual network adds
+     * hundreds of milliseconds, so a real run there says nothing about the app).
+     */
+    fun preview() {
+        val samples = listOf(41.0, 43.5, 44.2, 42.8, 45.1, 43.9, 44.6, 42.1, 46.3, 44.0, 43.2, 45.7, 44.8, 42.9, 43.6, 47.2, 44.1, 43.4, 45.0, 44.3)
+        _result.value = Result(stage = Stage.DONE, samples = samples, downloadMbps = 321.0)
+    }
+
     suspend fun run() {
         if (_result.value.isRunning) return
         var r = Result(stage = Stage.LATENCY)

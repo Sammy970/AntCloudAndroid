@@ -26,3 +26,7 @@
 # jMDNS
 -dontwarn javax.jmdns.impl.DNSCache
 -dontwarn org.slf4j.**
+
+# AntCloud: Socket.IO and Engine.IO look up parts of themselves by name; keep them whole.
+-keep class io.socket.** { *; }
+-dontwarn io.socket.**
