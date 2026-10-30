@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 android {
     ndkVersion "29.0.14206865"
@@ -8,7 +9,8 @@ android {
     namespace 'com.limelight'
 
     defaultConfig {
-        minSdk 21
+        // AntCloud: Compose needs Android 6.
+        minSdk 23
         targetSdk 36
 
         versionName "12.2"
@@ -22,6 +24,7 @@ android {
 
     buildFeatures {
         buildConfig = true
+        compose = true
         resValues = true
     }
 
@@ -49,7 +52,8 @@ android {
                 }
             }
 
-            applicationId "com.limelight"
+            // AntCloud: our own application ID, as Moonlight asks of forks.
+            applicationId "com.samyakjain.antcloud"
             dimension "root"
             buildConfigField "boolean", "ROOT_BUILD", "false"
         }
@@ -84,7 +88,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
-            resValue "string", "app_label", "Moonlight (Debug)"
+            resValue "string", "app_label", "AntCloud (Debug)"
             resValue "string", "app_label_root", "Moonlight (Root Debug)"
         }
         release {
@@ -119,7 +123,7 @@ android {
             //
             // TL;DR: Leave the following line alone!
             applicationIdSuffix ".unofficial"
-            resValue "string", "app_label", "Moonlight"
+            resValue "string", "app_label", "AntCloud"
             resValue "string", "app_label_root", "Moonlight (Root)"
 
             minifyEnabled true
@@ -150,4 +154,16 @@ dependencies {
     implementation 'com.github.cgutman:ShieldControllerExtensions:1.0.1'
 
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+
+    // AntCloud panel
+    implementation platform('androidx.compose:compose-bom:2026.09.00')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.activity:activity-compose:1.13.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
+    implementation('io.socket:socket.io-client:2.1.2') {
+        // Moonlight already ships org.json through Android itself.
+        exclude group: 'org.json', module: 'json'
+    }
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="antcloud_window">#0F1115</color>
+
+    <style name="AntCloudTheme" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/antcloud_window</item>
+        <item name="android:colorAccent">@color/antcloud_blue</item>
+    </style>
+</resources>
