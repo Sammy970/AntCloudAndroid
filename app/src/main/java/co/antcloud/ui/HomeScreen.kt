@@ -346,6 +346,9 @@ private fun StreamPage() {
             ToggleRow("HEVC (H.265)", "Sharper picture at the same bitrate, when your phone decodes it well.", settings.hevc, locked) { v -> update { it.copy(hevc = v) } }
         }
 
+        Section("Controllers & typing", "To type during a stream, tap the keyboard button in the bottom corner, or tap the screen with three fingers.")
+        Card { ControllersCard() }
+
         Section("Developer", null)
         Card {
             ToggleRow("Skip night-plan checks",

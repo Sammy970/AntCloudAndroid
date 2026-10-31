@@ -3,6 +3,8 @@ package co.antcloud.ui
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -26,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import co.antcloud.AntCloud
 import co.antcloud.AppState
+import co.antcloud.Diagnostics
 import co.antcloud.Log
 import co.antcloud.api.UpstreamStatus
 import co.antcloud.api.UserProfile
@@ -70,6 +73,15 @@ class AntCloudActivity : ComponentActivity() {
         // Back from Moonlight's stream screen: the stream is over, the cloud PC is still on.
         if (restored) AppState.session.streamEnded()
         restored = true
+    }
+
+    // The controller test (Stream → Controllers) sees input before Compose does, and keeps controller buttons.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        Diagnostics.onKey(event) || super.dispatchKeyEvent(event)
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        Diagnostics.onMotion(event)
+        return super.dispatchGenericMotionEvent(event)
     }
 
     override fun onDestroy() {

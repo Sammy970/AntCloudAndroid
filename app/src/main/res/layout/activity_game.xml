@@ -50,4 +50,20 @@
         android:preferKeepClear="true"
         android:visibility="gone" />
 
+    <!-- AntCloud: shows the phone's keyboard (a three-finger tap does too). Never takes focus from the stream. -->
+    <ImageButton
+        android:id="@+id/antcloudKeyboardButton"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:padding="10dp"
+        android:alpha="0.7"
+        android:src="@drawable/antcloud_keyboard"
+        android:background="@drawable/antcloud_keyboard_background"
+        android:contentDescription="Keyboard"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
+        android:preferKeepClear="true" />
+
 </merge>

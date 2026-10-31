@@ -104,6 +104,9 @@ Settings lock while you're streaming. The app follows your phone's light or dark
 - **Night-plan aware.** Checks the server clock before starting, so outside 12:30–9:30 AM IST it tells you
   instead of booting the PC, and ends the session at the plan's cutoff like the official client.
 - **Network check** without starting the cloud PC, with a verdict and a bitrate suggestion for your settings.
+- **Typing during a stream:** a keyboard button in the corner of the stream opens your phone's keyboard (a three-finger tap does too).
+- **Controller check** (Stream → Controllers): shows whether Android sees your controller as one the cloud PC will get, has a live button test,
+  and can share a diagnostics report with Moonlight's log if a controller doesn't work. Moonlight's own controller settings are one tap away.
 - **Motion with a purpose:** the monitor powers on, the track fills step by step, and a failed sign-in shakes.
 
 ## Download

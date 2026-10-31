@@ -272,6 +272,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         performanceOverlayView = findViewById(R.id.performanceOverlay);
 
+        // AntCloud: an on-screen button for the soft keyboard, since a three-finger tap is hard to discover.
+        findViewById(R.id.antcloudKeyboardButton).setOnClickListener(v -> toggleKeyboard());
+
         inputCaptureProvider = InputCaptureManager.getInputCaptureProvider(this, this);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
