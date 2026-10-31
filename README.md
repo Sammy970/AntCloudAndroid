@@ -94,6 +94,24 @@ A drawn monitor shows the answer, the track below it shows how far along you are
 
 Settings lock while you're streaming. The app follows your phone's light or dark mode; AntCloud blue is the only accent colour.
 
+## Check your controller
+
+<table>
+  <tr>
+    <td width="40%" valign="top">
+      <picture><source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/dark-controllers.png"><img src=".github/screenshots/light-controllers.png" width="100%" alt="Controllers tab: a drawn Xbox controller with the A button and right bumper lit, the right trigger at 70%, and a Ready to play badge"></picture>
+    </td>
+    <td width="60%" valign="top">
+      <p>The <b>Controllers</b> tab shows whether a controller will work before you start the cloud PC.</p>
+      <ul>
+        <li><b>A drawn controller that mirrors yours:</b> buttons light up as you press them, the sticks move with yours and the triggers fill as you pull them. Labels follow the controller: A B X Y, or ✕ ○ □ △ on PlayStation.</li>
+        <li><b>Ready to play, or not:</b> the same test Moonlight uses when a stream starts, with what to try if a controller won't be sent to the cloud PC.</li>
+        <li><b>Troubleshooting:</b> exact stick and trigger values, a vibration test, and a diagnostics report to share if a controller doesn't work.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
 ## Features
 
 - **Sign in** with email and password or a phone code. The refresh token is encrypted with a key that stays in the Android Keystore.
@@ -105,8 +123,9 @@ Settings lock while you're streaming. The app follows your phone's light or dark
   instead of booting the PC, and ends the session at the plan's cutoff like the official client.
 - **Network check** without starting the cloud PC, with a verdict and a bitrate suggestion for your settings.
 - **Typing during a stream:** a keyboard button in the corner of the stream opens your phone's keyboard (a three-finger tap does too).
-- **Controller check** (Stream → Controllers): shows whether Android sees your controller as one the cloud PC will get, has a live button test,
-  and can share a diagnostics report with Moonlight's log if a controller doesn't work. Moonlight's own controller settings are one tap away.
+- **Controller check** (the Controllers tab): a drawn controller mirrors every press, stick and trigger live, says whether the cloud PC
+  will get it as a controller, and has a vibration test. If a controller doesn't work, it can share a diagnostics report with Moonlight's
+  log, and Moonlight's own controller settings are one tap away.
 - **Motion with a purpose:** the monitor powers on, the track fills step by step, and a failed sign-in shakes.
 
 ## Download
@@ -169,7 +188,7 @@ adb shell am start -S -n com.samyakjain.antcloud.debug/co.antcloud.ui.AntCloudAc
 
 | Extra | Values |
 |---|---|
-| `preview` | `login`, `home:idle`, `home:queued`, `home:booting`, `home:ready`, `home:pairing`, `home:streaming`. Add `:stream`, `:network`, `:about`, `:notice` or `:upstream`. |
+| `preview` | `login`, `home:idle`, `home:queued`, `home:booting`, `home:ready`, `home:pairing`, `home:streaming`. Add `:stream`, `:network`, `:controllers`, `:about`, `:notice` or `:upstream`, and `:sample` for a sample controller. |
 | `theme` | `light` or `dark` |
 
 The network preview shows sample results, since the emulator's virtual network adds hundreds of milliseconds to a real run.
