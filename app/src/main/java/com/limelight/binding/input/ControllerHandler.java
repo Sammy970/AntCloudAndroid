@@ -1032,6 +1032,18 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
             return null;
         }
 
+        // AntCloud: some Android builds (vendor builds like realme UI on Android 14, as well as stock
+        // Android 11 below) deliver a controller's stick, trigger and D-pad movement from the virtual
+        // device while its buttons come from the controller itself. The virtual device has no axes of its
+        // own, so that movement would be read as zero. Give it to the real controller's context instead.
+        if (event.getDevice().isVirtual() && event instanceof MotionEvent &&
+                (event.getSource() & InputDevice.SOURCE_CLASS_JOYSTICK) != 0) {
+            InputDeviceContext controller = contextForVirtualMotion();
+            if (controller != null) {
+                return controller;
+            }
+        }
+
         // HACK for https://issuetracker.google.com/issues/163120692
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
             if (event.getDeviceId() == -1) {
@@ -1050,6 +1062,25 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
         inputDeviceContexts.put(event.getDeviceId(), context);
 
         return context;
+    }
+
+    // AntCloud: the context of the first connected controller with sticks, for movement that arrives from
+    // the virtual device (see getContextForEvent).
+    private InputDeviceContext contextForVirtualMotion() {
+        for (int id : InputDevice.getDeviceIds()) {
+            InputDevice dev = InputDevice.getDevice(id);
+            if (dev == null || dev.isVirtual() || !hasJoystickAxes(dev)) {
+                continue;
+            }
+
+            InputDeviceContext context = inputDeviceContexts.get(id);
+            if (context == null) {
+                context = createInputDeviceContextForDevice(dev);
+                inputDeviceContexts.put(id, context);
+            }
+            return context;
+        }
+        return null;
     }
 
     private byte maxByMagnitude(byte a, byte b) {

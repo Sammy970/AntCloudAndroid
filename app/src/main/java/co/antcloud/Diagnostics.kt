@@ -110,7 +110,7 @@ object Diagnostics {
             event.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
             event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-            record("${KeyEvent.keyCodeToString(event.keyCode).removePrefix("KEYCODE_")} from ${event.device?.name ?: "unknown"}")
+            record("${KeyEvent.keyCodeToString(event.keyCode).removePrefix("KEYCODE_")} from ${source(event.device, event.deviceId)}")
         }
         return fromController
     }
@@ -129,8 +129,10 @@ object Diagnostics {
             "LX" to MotionEvent.AXIS_X, "LY" to MotionEvent.AXIS_Y, "RX" to MotionEvent.AXIS_Z, "RY" to MotionEvent.AXIS_RZ,
             "LT" to MotionEvent.AXIS_LTRIGGER, "RT" to MotionEvent.AXIS_RTRIGGER, "HatX" to MotionEvent.AXIS_HAT_X, "HatY" to MotionEvent.AXIS_HAT_Y,
         ).mapNotNull { (name, axis) -> event.getAxisValue(axis).takeIf { kotlin.math.abs(it) > 0.15f }?.let { "$name %.2f".format(it) } }
-        if (axes.isNotEmpty()) record("Stick ${axes.joinToString(" ")} from ${event.device?.name ?: "unknown"}")
+        if (axes.isNotEmpty()) record("Stick ${axes.joinToString(" ")} from ${source(event.device, event.deviceId)}")
     }
+
+    private fun source(device: InputDevice?, id: Int) = "${device?.name ?: "unknown"} (id $id)"
 
     private fun record(line: String) {
         Log.info("[controller-test] $line")
