@@ -47,7 +47,7 @@ object Diagnostics {
      * Connected controllers and keyboards, as Android reports them. The phone's own inputs (screen, volume
      * keys, fingerprint sensor) are left out, unless they claim to be a gamepad.
      */
-    fun devices(): List<Device> = InputDevice.getDeviceIds().toList().mapNotNull { id ->
+    fun devices(): List<Device> = previewDevices ?: InputDevice.getDeviceIds().toList().mapNotNull { id ->
         val dev = InputDevice.getDevice(id) ?: return@mapNotNull null
         if (dev.isVirtual) return@mapNotNull null
         fun has(source: Int) = dev.sources and source == source
@@ -89,6 +89,34 @@ object Diagnostics {
 
     // Live input
 
+    enum class Button { A, B, X, Y, LB, RB, L3, R3, UP, DOWN, LEFT, RIGHT, VIEW, MENU, HOME }
+
+    /** What the drawn controller shows: buttons held down, stick positions (-1…1, up positive) and triggers (0…1). */
+    data class PadState(
+        val pressed: Set<Button> = emptySet(),
+        val lx: Float = 0f, val ly: Float = 0f, val rx: Float = 0f, val ry: Float = 0f,
+        val lt: Float = 0f, val rt: Float = 0f,
+    )
+
+    private val _pad = MutableStateFlow(PadState())
+    /** The controller's live state while the Controllers tab is open. */
+    val pad: StateFlow<PadState> = _pad
+
+    /** D-pad and buttons held as key presses, and D-pad directions held on the hat axis; the drawing shows both. */
+    private var heldKeys = emptySet<Button>()
+    private var hatButtons = emptySet<Button>()
+
+    private val keyButtons = mapOf(
+        KeyEvent.KEYCODE_BUTTON_A to Button.A, KeyEvent.KEYCODE_BUTTON_B to Button.B,
+        KeyEvent.KEYCODE_BUTTON_X to Button.X, KeyEvent.KEYCODE_BUTTON_Y to Button.Y,
+        KeyEvent.KEYCODE_BUTTON_L1 to Button.LB, KeyEvent.KEYCODE_BUTTON_R1 to Button.RB,
+        KeyEvent.KEYCODE_BUTTON_THUMBL to Button.L3, KeyEvent.KEYCODE_BUTTON_THUMBR to Button.R3,
+        KeyEvent.KEYCODE_DPAD_UP to Button.UP, KeyEvent.KEYCODE_DPAD_DOWN to Button.DOWN,
+        KeyEvent.KEYCODE_DPAD_LEFT to Button.LEFT, KeyEvent.KEYCODE_DPAD_RIGHT to Button.RIGHT,
+        KeyEvent.KEYCODE_BUTTON_SELECT to Button.VIEW, KeyEvent.KEYCODE_BUTTON_START to Button.MENU,
+        KeyEvent.KEYCODE_BUTTON_MODE to Button.HOME,
+    )
+
     /** The last few inputs seen while the controller test is open, newest first. */
     private val _inputs = MutableStateFlow<List<String>>(emptyList())
     val inputs: StateFlow<List<String>> = _inputs
@@ -97,7 +125,11 @@ object Diagnostics {
     @Volatile var listening = false
 
     fun clearInputs() {
+        if (previewing) return
         _inputs.value = emptyList()
+        heldKeys = emptySet()
+        hatButtons = emptySet()
+        _pad.value = PadState()
     }
 
     /**
@@ -109,6 +141,10 @@ object Diagnostics {
         val fromController = KeyEvent.isGamepadButton(event.keyCode) ||
             event.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
             event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
+        keyButtons[event.keyCode]?.let { button ->
+            heldKeys = if (event.action == KeyEvent.ACTION_DOWN) heldKeys + button else heldKeys - button
+            _pad.value = _pad.value.copy(pressed = heldKeys + hatButtons)
+        }
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
             record("${KeyEvent.keyCodeToString(event.keyCode).removePrefix("KEYCODE_")} from ${source(event.device, event.deviceId)}")
         }
@@ -121,6 +157,23 @@ object Diagnostics {
         if (!listening) return
         val joystick = event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
         if (!joystick || event.action != MotionEvent.ACTION_MOVE) return
+        // The drawing follows every event; the D-pad on most controllers arrives as a hat axis.
+        val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
+        val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+        hatButtons = buildSet {
+            if (hatX < -0.5f) add(Button.LEFT)
+            if (hatX > 0.5f) add(Button.RIGHT)
+            if (hatY < -0.5f) add(Button.UP)
+            if (hatY > 0.5f) add(Button.DOWN)
+        }
+        _pad.value = _pad.value.copy(
+            pressed = heldKeys + hatButtons,
+            lx = event.getAxisValue(MotionEvent.AXIS_X), ly = -event.getAxisValue(MotionEvent.AXIS_Y),
+            rx = event.getAxisValue(MotionEvent.AXIS_Z), ry = -event.getAxisValue(MotionEvent.AXIS_RZ),
+            // Controllers report triggers on one of two pairs of axes.
+            lt = maxOf(event.getAxisValue(MotionEvent.AXIS_LTRIGGER), event.getAxisValue(MotionEvent.AXIS_BRAKE)),
+            rt = maxOf(event.getAxisValue(MotionEvent.AXIS_RTRIGGER), event.getAxisValue(MotionEvent.AXIS_GAS)),
+        )
         // Sticks send a stream of events; one line every half second is enough to see them working.
         val now = System.currentTimeMillis()
         if (now - lastMotion < 500) return
@@ -131,6 +184,26 @@ object Diagnostics {
         ).mapNotNull { (name, axis) -> event.getAxisValue(axis).takeIf { kotlin.math.abs(it) > 0.15f }?.let { "$name %.2f".format(it) } }
         if (axes.isNotEmpty()) record("Stick ${axes.joinToString(" ")} from ${source(event.device, event.deviceId)}")
     }
+
+    /** A short buzz on the controller, to check its motors. Returns false if it has none Android can drive. */
+    fun vibrate(deviceId: Int): Boolean {
+        val dev = InputDevice.getDevice(deviceId) ?: return false
+        val vibrator = if (Build.VERSION.SDK_INT >= 31) dev.vibratorManager.defaultVibrator else @Suppress("DEPRECATION") dev.vibrator
+        if (!vibrator.hasVibrator()) return false
+        vibrator.vibrate(android.os.VibrationEffect.createOneShot(450, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+        return true
+    }
+
+    /** Screenshot mode: a sample controller mid-press, without hardware. */
+    private var previewDevices: List<Device>? = null
+
+    fun previewPad() {
+        previewDevices = listOf(Device(-2, "Xbox Wireless Controller", 0x045e, 0x02e0, listOf("gamepad", "joystick", "keyboard"), true, Kind.CONTROLLER))
+        _pad.value = PadState(pressed = setOf(Button.A, Button.RB), lx = 0.55f, ly = 0.35f, rt = 0.7f)
+    }
+
+    /** Keeps the screenshot sample's input on screen. */
+    val previewing get() = previewDevices != null
 
     private fun source(device: InputDevice?, id: Int) = "${device?.name ?: "unknown"} (id $id)"
 

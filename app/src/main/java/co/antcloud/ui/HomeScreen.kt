@@ -87,7 +87,8 @@ import kotlinx.coroutines.withContext
 import java.net.URL
 
 private enum class Tab(val title: String, val icon: ImageVector) {
-    CLOUD("Cloud PC", AcIcons.Monitor), STREAM("Stream", AcIcons.Sliders), NETWORK("Network", AcIcons.Gauge), ABOUT("About", AcIcons.Info)
+    CLOUD("Cloud PC", AcIcons.Monitor), STREAM("Stream", AcIcons.Sliders), NETWORK("Network", AcIcons.Gauge),
+    CONTROLLERS("Controllers", AcIcons.Gamepad), ABOUT("About", AcIcons.Info)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,6 +130,7 @@ fun HomeScreen(bridge: MoonlightBridge, initialTab: String?) {
                 Tab.CLOUD -> CloudPcPage(bridge) { tab = Tab.STREAM }
                 Tab.STREAM -> StreamPage()
                 Tab.NETWORK -> NetworkPage()
+                Tab.CONTROLLERS -> ControllersPage()
                 Tab.ABOUT -> AboutPage()
             }
         }
@@ -346,8 +348,7 @@ private fun StreamPage() {
             ToggleRow("HEVC (H.265)", "Sharper picture at the same bitrate, when your phone decodes it well.", settings.hevc, locked) { v -> update { it.copy(hevc = v) } }
         }
 
-        Section("Controllers & typing", "To type during a stream, tap the keyboard button in the bottom corner, or tap the screen with three fingers.")
-        Card { ControllersCard() }
+        Section("Typing", "To type during a stream, tap the keyboard button in the bottom corner, or tap the screen with three fingers. Check your controller in the Controllers tab.")
 
         Section("Developer", null)
         Card {
