@@ -6,9 +6,9 @@ package com.limelight.binding.input.virtual_controller;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.view.MotionEvent;
+
+import co.antcloud.osc.OscGlass;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -121,8 +121,6 @@ public class AnalogStick extends VirtualControllerElement {
     private float position_stick_x = 0;
     private float position_stick_y = 0;
 
-    private final Paint paint = new Paint();
-
     private STICK_STATE stick_state = STICK_STATE.NO_MOVEMENT;
     private CLICK_STATE click_state = CLICK_STATE.SINGLE;
 
@@ -210,47 +208,24 @@ public class AnalogStick extends VirtualControllerElement {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         // calculate new radius sizes depending
-        radius_complete = getPercent(getCorrectWidth() / 2, 100) - 2 * getDefaultStrokeWidth();
-        radius_dead_zone = getPercent(getCorrectWidth() / 2, 30);
-        radius_analog_stick = getPercent(getCorrectWidth() / 2, 20);
+        // AntCloud: the knob is as big as the glass knob (58 of the ring's 124), so travel and dead zone follow it
+        radius_complete = getCorrectWidth() / 2f;
+        radius_dead_zone = getPercent(radius_complete, 10);
+        radius_analog_stick = radius_complete * 58f / 124f;
 
         super.onSizeChanged(w, h, oldw, oldh);
     }
 
     @Override
     protected void onElementDraw(Canvas canvas) {
-        // set transparent background
-        canvas.drawColor(Color.TRANSPARENT);
-
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(getDefaultStrokeWidth());
-
-        // draw outer circle
-        if (!isPressed() || click_state == CLICK_STATE.SINGLE) {
-            paint.setColor(getDefaultColor());
-        } else {
-            paint.setColor(pressedColor);
+        boolean active = isPressed() && stick_state != STICK_STATE.NO_MOVEMENT;
+        float kx = 0, ky = 0;
+        if (active) {
+            kx = position_stick_x - getWidth() / 2f;
+            ky = position_stick_y - getHeight() / 2f;
         }
-        canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_complete, paint);
-
-        paint.setColor(getDefaultColor());
-        // draw dead zone
-        canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_dead_zone, paint);
-
-        // draw stick depending on state
-        switch (stick_state) {
-            case NO_MOVEMENT: {
-                paint.setColor(getDefaultColor());
-                canvas.drawCircle(getWidth() / 2, getHeight() / 2, radius_analog_stick, paint);
-                break;
-            }
-            case MOVED_IN_DEAD_ZONE:
-            case MOVED_ACTIVE: {
-                paint.setColor(pressedColor);
-                canvas.drawCircle(position_stick_x, position_stick_y, radius_analog_stick, paint);
-                break;
-            }
-        }
+        OscGlass.drawStick(canvas, getWidth(), elementId == EID_LS, kx, ky, active,
+                getResources().getDisplayMetrics().density);
     }
 
     private void updatePosition(long eventTime) {

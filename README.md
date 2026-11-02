@@ -112,6 +112,23 @@ Settings lock while you're streaming. The app follows your phone's light or dark
   </tr>
 </table>
 
+## Glass on-screen controls, placed where you want them
+
+<table>
+  <tr>
+    <td width="50%"><img src=".github/screenshots/controls-editor.png" width="100%" alt="The controls editor: a glass gamepad over a sunset, the D-pad selected with a dashed outline and a panel with Size and Opacity sliders and Hide, Reset and Done buttons"></td>
+    <td width="50%"><img src=".github/screenshots/controls-try.png" width="100%" alt="Try it mode: the same glass gamepad, ready to press without sending anything to the cloud PC"></td>
+  </tr>
+</table>
+
+The touch gamepad is drawn as smoky glass: an A B X Y diamond, a D-pad made of four separate pieces, tilted LT, LB, RT and RB buttons,
+Back and Start pills, LS and RS buttons and big stick rings. Pressed buttons light up AntCloud blue.
+
+- **Move and resize:** drag any control, then use **Size** to make it bigger or smaller. Guide lines help you line things up.
+- **Hide and fade:** hide the controls you don't use and set how see-through the whole gamepad is.
+- **Try it:** press the controls to see how they react. Nothing is sent to the cloud PC.
+- **Where:** Settings → Stream → **Customize on-screen controls** (no cloud PC needed), or the gear button at the top-left during a stream.
+
 ## Features
 
 - **Sign in** with email and password or a phone code. The refresh token is encrypted with a key that stays in the Android Keystore.
@@ -126,6 +143,7 @@ Settings lock while you're streaming. The app follows your phone's light or dark
 - **Controller check** (the Controllers tab): a drawn controller mirrors every press, stick and trigger live, says whether the cloud PC
   will get it as a controller, and has a vibration test. If a controller doesn't work, it can share a diagnostics report with Moonlight's
   log, and Moonlight's own controller settings are one tap away.
+- **Glass on-screen controls** you can move, resize, hide and fade, with a Try it mode.
 - **Motion with a purpose:** the monitor powers on, the track fills step by step, and a failed sign-in shakes.
 
 ## Download

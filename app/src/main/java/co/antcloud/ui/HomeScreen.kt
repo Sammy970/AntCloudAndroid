@@ -65,7 +65,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
+import co.antcloud.osc.OscEditorActivity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -345,6 +347,20 @@ private fun StreamPage() {
         Section("Codec", null)
         Card {
             ToggleRow("HEVC (H.265)", "Sharper picture at the same bitrate, when your phone decodes it well.", settings.hevc, locked) { v -> update { it.copy(hevc = v) } }
+        }
+
+        Section("On-screen controls", "The glass gamepad shown over the stream. Move, resize, hide or fade each control. You can also edit them during a stream with the gear button.")
+        val context = LocalContext.current
+        Card(Modifier.clickable { context.startActivity(Intent(context, OscEditorActivity::class.java)) }) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(AcIcons.Gamepad, null, Modifier.size(20.dp), tint = AntBlue)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Customize on-screen controls", style = MaterialTheme.typography.bodyLarge)
+                    Text("Opens a preview, no cloud PC needed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(AcIcons.ArrowUpRight, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
 
         Section("Typing", "To type during a stream, tap the keyboard button in the bottom corner, or tap the screen with three fingers. Check your controller in the Controllers tab.")

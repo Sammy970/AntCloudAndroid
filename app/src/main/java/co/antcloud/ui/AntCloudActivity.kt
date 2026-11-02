@@ -106,6 +106,9 @@ class AntCloudActivity : ComponentActivity() {
         if ("upstream" in parts) UpstreamStatus.preview(0.017, null)
         if ("network" in parts) AppState.network.preview()
         if ("sample" in parts) Diagnostics.previewPad()
+        // `home:ready:stream:osc` opens the on-screen controls editor; `--es select dpad` and `--ez try true` pass through.
+        if ("osc" in parts) startActivity(Intent(this, co.antcloud.osc.OscEditorActivity::class.java)
+            .putExtra("select", intent.getStringExtra("select")).putExtra("try", intent.getBooleanExtra("try", false)))
     }
 }
 

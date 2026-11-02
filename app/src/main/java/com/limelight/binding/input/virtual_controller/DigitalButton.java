@@ -6,11 +6,9 @@ package com.limelight.binding.input.virtual_controller;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.RectF;
-import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
+
+import co.antcloud.osc.OscGlass;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,9 +49,6 @@ public class DigitalButton extends VirtualControllerElement {
             onLongClickCallback();
         }
     };
-
-    private final Paint paint = new Paint();
-    private final RectF rect = new RectF();
 
     private int layer;
     private DigitalButton movingButton = null;
@@ -135,31 +130,8 @@ public class DigitalButton extends VirtualControllerElement {
 
     @Override
     protected void onElementDraw(Canvas canvas) {
-        // set transparent background
-        canvas.drawColor(Color.TRANSPARENT);
-
-        paint.setTextSize(getPercent(getWidth(), 25));
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setStrokeWidth(getDefaultStrokeWidth());
-
-        paint.setColor(isPressed() ? pressedColor : getDefaultColor());
-        paint.setStyle(Paint.Style.STROKE);
-
-        rect.left = rect.top = paint.getStrokeWidth();
-        rect.right = getWidth() - rect.left;
-        rect.bottom = getHeight() - rect.top;
-
-        canvas.drawOval(rect, paint);
-
-        if (icon != -1) {
-            Drawable d = getResources().getDrawable(icon);
-            d.setBounds(5, 5, getWidth() - 5, getHeight() - 5);
-            d.draw(canvas);
-        } else {
-            paint.setStyle(Paint.Style.FILL_AND_STROKE);
-            paint.setStrokeWidth(getDefaultStrokeWidth()/2);
-            canvas.drawText(text, getPercent(getWidth(), 50), getPercent(getHeight(), 63), paint);
-        }
+        OscGlass.drawButton(canvas, elementId, text, getWidth(), getHeight(), isPressed(),
+                getResources().getDisplayMetrics().density);
     }
 
     private void onClickCallback() {

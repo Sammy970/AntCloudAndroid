@@ -11,11 +11,15 @@ import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.Toast;
 
 import com.limelight.LimeLog;
 import com.limelight.R;
 import com.limelight.binding.input.ControllerHandler;
+
+import co.antcloud.osc.OscEditorOverlay;
+import co.antcloud.osc.OscGeometry;
+import co.antcloud.osc.OscLayout;
+import co.antcloud.osc.OscStore;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -59,11 +63,31 @@ public class VirtualController {
 
     private List<VirtualControllerElement> elements = new ArrayList<>();
 
+    // AntCloud: the player's layout (co.antcloud.osc) and the glass editor over it
+    private OscLayout layout;
+    private OscEditorOverlay editor = null;
+    private boolean arranging = false;
+    private boolean previewOnly = false;
+    private int appliedWidth = -1, appliedHeight = -1;
+
     public VirtualController(final ControllerHandler controllerHandler, FrameLayout layout, final Context context) {
         this.controllerHandler = controllerHandler;
         this.frame_layout = layout;
         this.context = context;
         this.handler = new Handler(Looper.getMainLooper());
+        this.layout = OscStore.load(context);
+
+        // The glass controls draw their shadow and glow outside their bounds
+        frame_layout.setClipChildren(false);
+        // A new screen size (rotation, split screen) re-places the controls
+        frame_layout.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
+                if (!elements.isEmpty() && (r - l != appliedWidth || b - t != appliedHeight)) {
+                    relayout();
+                }
+            }
+        });
 
         buttonConfigure = new Button(context);
         buttonConfigure.setAlpha(0.25f);
@@ -72,27 +96,7 @@ public class VirtualController {
         buttonConfigure.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String message;
-
-                if (currentMode == ControllerMode.Active){
-                    currentMode = ControllerMode.MoveButtons;
-                    message = "Entering configuration mode (Move buttons)";
-                } else if (currentMode == ControllerMode.MoveButtons) {
-                    currentMode = ControllerMode.ResizeButtons;
-                    message = "Entering configuration mode (Resize buttons)";
-                } else {
-                    currentMode = ControllerMode.Active;
-                    VirtualControllerConfigurationLoader.saveProfile(VirtualController.this, context);
-                    message = "Exiting configuration mode";
-                }
-
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
-
-                buttonConfigure.invalidate();
-
-                for (VirtualControllerElement element : elements) {
-                    element.invalidate();
-                }
+                beginEditing(true, null);
             }
         });
 
@@ -111,14 +115,17 @@ public class VirtualController {
     }
 
     public void show() {
-        for (VirtualControllerElement element : elements) {
-            element.setVisibility(View.VISIBLE);
-        }
+        // Controls the player hid stay hidden
+        relayout();
 
-        buttonConfigure.setVisibility(View.VISIBLE);
+        buttonConfigure.setVisibility(editor == null ? View.VISIBLE : View.GONE);
     }
 
     public void removeElements() {
+        if (editor != null) {
+            frame_layout.removeView(editor);
+            editor = null;
+        }
         for (VirtualControllerElement element : elements) {
             frame_layout.removeView(element);
         }
@@ -128,9 +135,88 @@ public class VirtualController {
     }
 
     public void setOpacity(int opacity) {
-        for (VirtualControllerElement element : elements) {
-            element.setOpacity(opacity);
+        layout.setOpacity(opacity / 100f);
+        relayout();
+    }
+
+    public OscLayout getLayout() {
+        return layout;
+    }
+
+    public FrameLayout getFrameLayout() {
+        return frame_layout;
+    }
+
+    public Context getContext() {
+        return context;
+    }
+
+    public boolean isArranging() {
+        return arranging;
+    }
+
+    /** Sizes, places and shows the controls from the layout. Cheap enough to call on every change. */
+    public void relayout() {
+        int w = frame_layout.getWidth(), h = frame_layout.getHeight();
+        if (w <= 0 || h <= 0) {
+            DisplayMetrics screen = context.getResources().getDisplayMetrics();
+            w = screen.widthPixels;
+            h = screen.heightPixels;
         }
+        appliedWidth = frame_layout.getWidth();
+        appliedHeight = frame_layout.getHeight();
+        OscGeometry.apply(this, frame_layout, w, h, layout, arranging);
+        if (editor != null) {
+            editor.invalidate();
+        }
+    }
+
+    /**
+     * Opens the glass editor over the controls. While it is open nothing reaches the PC: the pad is released
+     * first, then input is held back. [tryable] adds the "Try it" preview.
+     */
+    public void beginEditing(boolean tryable, final Runnable onDone) {
+        if (editor != null) {
+            return;
+        }
+        inputContext = new ControllerInputContext();
+        sendControllerInputContextInternal();
+        handler.removeCallbacks(delayedRetransmitRunnable);
+        previewOnly = true;
+        buttonConfigure.setVisibility(View.GONE);
+
+        editor = new OscEditorOverlay(context, this, tryable, new Runnable() {
+            @Override
+            public void run() {
+                endEditing();
+                if (onDone != null) {
+                    onDone.run();
+                }
+            }
+        });
+        setArranging(true);
+        frame_layout.addView(editor, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+    }
+
+    private void endEditing() {
+        if (editor != null) {
+            frame_layout.removeView(editor);
+            editor = null;
+        }
+        previewOnly = false;
+        arranging = false;
+        currentMode = ControllerMode.Active;
+        // Rebuild so nothing the player pressed while trying stays lit
+        refreshLayout();
+        buttonConfigure.setVisibility(View.VISIBLE);
+    }
+
+    /** Arranging: every control shows, and touches belong to the editor. Otherwise the controls take touches (the preview does not send them). */
+    public void setArranging(boolean on) {
+        arranging = on;
+        currentMode = on ? ControllerMode.MoveButtons : ControllerMode.Active;
+        relayout();
     }
 
 
@@ -153,6 +239,11 @@ public class VirtualController {
     }
 
     public void refreshLayout() {
+        if (editor != null) {
+            // A new screen size while editing: just re-place
+            relayout();
+            return;
+        }
         removeElements();
 
         DisplayMetrics screen = context.getResources().getDisplayMetrics();
@@ -163,11 +254,10 @@ public class VirtualController {
         params.topMargin = 15;
         frame_layout.addView(buttonConfigure, params);
 
-        // Start with the default layout
+        // Rebuild from the player's saved layout
+        layout = OscStore.load(context);
         VirtualControllerConfigurationLoader.createDefaultLayout(this, context);
-
-        // Apply user preferences onto the default layout
-        VirtualControllerConfigurationLoader.loadFromPreferences(this, context);
+        relayout();
     }
 
     public ControllerMode getControllerMode() {
@@ -185,7 +275,7 @@ public class VirtualController {
         _DBG("LEFT STICK X: " + inputContext.leftStickX + " Y: " + inputContext.leftStickY);
         _DBG("RIGHT STICK X: " + inputContext.rightStickX + " Y: " + inputContext.rightStickY);
 
-        if (controllerHandler != null) {
+        if (controllerHandler != null && !previewOnly) {
             controllerHandler.reportOscState(
                     inputContext.inputMap,
                     inputContext.leftStickX,
