@@ -83,7 +83,7 @@ class SessionService(val api: ApiClient, private val scope: CoroutineScope) {
      */
     suspend fun startIfAllowed(settings: StreamSettings, nightPlan: Boolean) {
         if (_phase.value != Phase.IDLE) return
-        if (nightPlan && !nightPlanMonitorDisabled) {
+        if (nightPlan) {
             val now = api.serverTime() ?: OffsetDateTime.now()
             if (!isNightPlanWindow(now)) {
                 Log.info("[session] night plan outside its hours; not starting")
@@ -239,10 +239,6 @@ class SessionService(val api: ApiClient, private val scope: CoroutineScope) {
 
     /** Night plans are only valid 00:30–09:35 IST; end the session once the server clock passes the cutoff. */
     private fun startNightPlanMonitor() {
-        if (nightPlanMonitorDisabled) {
-            Log.info("[session] night-plan monitor disabled by setting; not starting")
-            return
-        }
         nightPlan?.cancel()
         nightPlan = scope.launch {
             while (isActive) {
@@ -305,14 +301,6 @@ class SessionService(val api: ApiClient, private val scope: CoroutineScope) {
             if (!end.isAfter(ist)) end = end.plusDays(1)
             return end.withZoneSameInstant(ZoneId.systemDefault())
         }
-
-        /**
-         * When true, the client-side night-plan checks are off (for testing). This does NOT affect the server's
-         * own enforcement of night-plan hours.
-         */
-        var nightPlanMonitorDisabled: Boolean
-            get() = AntCloud.prefs.getBoolean("nightPlanMonitorDisabled", false)
-            set(value) { AntCloud.prefs.edit().putBoolean("nightPlanMonitorDisabled", value).apply() }
 
         private val INACTIVE_MESSAGES = mapOf(
             "daytime" to ("Night Plan" to "Outside active hours. Come back between 12:30 AM and 9:30 AM."),

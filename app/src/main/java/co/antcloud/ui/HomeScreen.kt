@@ -311,7 +311,6 @@ private fun StreamPage() {
     val settings by AppState.settings.collectAsState()
     val phase by AppState.session.phase.collectAsState()
     val locked = phase == Phase.PAIRING || phase == Phase.STREAMING
-    var skipNightPlan by remember { mutableStateOf(SessionService.nightPlanMonitorDisabled) }
     fun update(change: (StreamSettings) -> StreamSettings) { if (!locked) AppState.updateSettings(change) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -350,12 +349,6 @@ private fun StreamPage() {
 
         Section("Typing", "To type during a stream, tap the keyboard button in the bottom corner, or tap the screen with three fingers. Check your controller in the Controllers tab.")
 
-        Section("Developer", null)
-        Card {
-            ToggleRow("Skip night-plan checks",
-                "For testing. Skips the app's own hours check before starting and its 9:35 AM IST cutoff. AntCloud still enforces plan hours on its servers.",
-                skipNightPlan, false) { skipNightPlan = it; SessionService.nightPlanMonitorDisabled = it }
-        }
         Spacer(Modifier.height(16.dp))
     }
 }
