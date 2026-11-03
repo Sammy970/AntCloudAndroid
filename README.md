@@ -17,6 +17,11 @@ Sign in, start the cloud PC, watch it boot, and play. Pairing happens on its own
 
 <p><a href="#download"><b>Download</b></a> &nbsp;·&nbsp; <a href="#the-whole-session-on-one-screen">Screenshots</a> &nbsp;·&nbsp; <a href="#how-it-works">How it works</a> &nbsp;·&nbsp; <a href="#building-it-yourself">Build</a> &nbsp;·&nbsp; <a href="#project-layout">Project layout</a> &nbsp;·&nbsp; <a href="#made-by">Made by</a></p>
 
+<p>
+  <a href="https://discord.gg/GVDYtpWHps"><img src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the Samyak Labs Discord"></a><br>
+  <b>Need help, found a bug, or have an idea?</b> Join the community: get help, report bugs and suggest features for AntCloud.
+</p>
+
 </div>
 
 > [!IMPORTANT]
