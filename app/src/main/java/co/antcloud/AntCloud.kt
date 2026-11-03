@@ -25,7 +25,7 @@ object Config {
      * This app's version: `0.<AntCloud release>.<our release>`, the same scheme as the other apps. 0.16.x
      * matches AntCloud's Windows app 0.016, whose API routes `ApiClient` uses.
      */
-    const val APP_VERSION = "0.16.5"
+    const val APP_VERSION = "0.16.6"
 
     /** The AntCloud Windows client version this build matches, read from `APP_VERSION` (0.16.x → 0.016). */
     val matchedClientVersion: Double

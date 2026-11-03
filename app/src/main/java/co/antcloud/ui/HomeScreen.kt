@@ -68,6 +68,8 @@ import androidx.compose.ui.layout.ContentScale
 import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
 import co.antcloud.osc.OscEditorActivity
+import co.antcloud.osc.OscLayout
+import co.antcloud.osc.OscStore
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -90,13 +92,13 @@ import java.net.URL
 
 private enum class Tab(val title: String, val icon: ImageVector) {
     CLOUD("Cloud PC", AcIcons.Monitor), STREAM("Stream", AcIcons.Sliders), NETWORK("Network", AcIcons.Gauge),
-    CONTROLLERS("Controllers", AcIcons.Gamepad), ABOUT("About", AcIcons.Info)
+    CONTROLLERS("Controls", AcIcons.Gamepad), ABOUT("About", AcIcons.Info)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(bridge: MoonlightBridge, initialTab: String?) {
-    var tab by rememberSaveable { mutableStateOf(Tab.entries.firstOrNull { it.name.equals(initialTab, true) } ?: Tab.CLOUD) }
+    var tab by rememberSaveable { mutableStateOf(Tab.entries.firstOrNull { it.name.equals(initialTab, true) || (it == Tab.CONTROLLERS && initialTab.equals("controls", true)) } ?: Tab.CLOUD) }
     val phase by AppState.session.phase.collectAsState()
 
     Scaffold(
@@ -132,7 +134,7 @@ fun HomeScreen(bridge: MoonlightBridge, initialTab: String?) {
                 Tab.CLOUD -> CloudPcPage(bridge) { tab = Tab.STREAM }
                 Tab.STREAM -> StreamPage()
                 Tab.NETWORK -> NetworkPage()
-                Tab.CONTROLLERS -> ControllersPage()
+                Tab.CONTROLLERS -> ControllersPage(header = { OnScreenControlsSection() })
                 Tab.ABOUT -> AboutPage()
             }
         }
@@ -349,21 +351,7 @@ private fun StreamPage() {
             ToggleRow("HEVC (H.265)", "Sharper picture at the same bitrate, when your phone decodes it well.", settings.hevc, locked) { v -> update { it.copy(hevc = v) } }
         }
 
-        Section("On-screen controls", "The glass gamepad shown over the stream. Move, resize, hide or fade each control. You can also edit them during a stream with the gear button.")
-        val context = LocalContext.current
-        Card(Modifier.clickable { context.startActivity(Intent(context, OscEditorActivity::class.java)) }) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(AcIcons.Gamepad, null, Modifier.size(20.dp), tint = AntBlue)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Customize on-screen controls", style = MaterialTheme.typography.bodyLarge)
-                    Text("Opens a preview, no cloud PC needed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Icon(AcIcons.ArrowUpRight, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        Section("Typing", "To type during a stream, tap the keyboard button in the bottom corner, or tap the screen with three fingers. Check your controller in the Controllers tab.")
+        Section("Typing", "To type during a stream, tap the keyboard button in the bottom corner, or tap the screen with three fingers. Check your controller in the Controls tab.")
 
         Spacer(Modifier.height(16.dp))
     }
@@ -399,6 +387,45 @@ private fun ToggleRow(title: String, detail: String, checked: Boolean, locked: B
         }
         Spacer(Modifier.width(12.dp))
         Switch(checked, onChange, enabled = !locked)
+    }
+}
+
+// MARK: Controls
+
+/** Top of the Controls tab: floating sticks, idle fade and the layout editor, all stored in [OscStore]. */
+@Composable
+private fun OnScreenControlsSection() {
+    val context = LocalContext.current
+    val layout = remember { OscStore.load(context) }
+    var floating by remember { mutableStateOf(layout.floatingSticks) }
+    var fade by remember { mutableStateOf(layout.fadeAfter) }
+
+    Section("On-screen controls", "The glass gamepad shown over the stream. You can also edit it during a stream with the gear button.")
+    Card {
+        ToggleRow("Floating sticks", "Touch anywhere on the left or right half of the screen and a stick appears under your finger. The fixed sticks are hidden.", floating, false) { v ->
+            floating = v
+            layout.floatingSticks = v
+            OscStore.save(context, layout)
+        }
+    }
+    Card {
+        Label("Fade controls when idle")
+        Segments(OscLayout.FADE_CHOICES.map { (if (it == 0) "Off" else "$it s") to it.toString() }, fade.toString(), false) { v ->
+            fade = v.toInt()
+            layout.fadeAfter = fade
+            OscStore.save(context, layout)
+        }
+    }
+    Card(Modifier.clickable { context.startActivity(Intent(context, OscEditorActivity::class.java)) }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(AcIcons.Gamepad, null, Modifier.size(20.dp), tint = AntBlue)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Customize layout", style = MaterialTheme.typography.bodyLarge)
+                Text("Move, resize or remove each control, and set how see-through they are. Opens a preview, no cloud PC needed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(AcIcons.ArrowUpRight, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

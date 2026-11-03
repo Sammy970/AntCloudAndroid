@@ -7,7 +7,9 @@ package com.limelight.binding.input.virtual_controller;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.DisplayMetrics;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
@@ -70,12 +72,39 @@ public class VirtualController {
     private boolean previewOnly = false;
     private int appliedWidth = -1, appliedHeight = -1;
 
+    // AntCloud: floating sticks (a touch on empty screen spawns a stick) and the idle fade
+    private static final long FADE_OUT_MS = 400, FADE_IN_MS = 150;
+    private final FloatingSticks floating;
+    private boolean hidden = false;
+    private boolean faded = false;
+    private boolean idlePosted = false;
+    private boolean streamHeld = false;
+    private long lastTouchTime = 0;
+    private final Runnable idleRunnable = new Runnable() {
+        @Override
+        public void run() {
+            idlePosted = false;
+            if (!canFade()) {
+                return;
+            }
+            long remaining = lastTouchTime + layout.getFadeAfter() * 1000L - SystemClock.uptimeMillis();
+            if (remaining > 0) {
+                postIdle(remaining);
+            } else if (isTouchHeld()) {
+                postIdle(1000);
+            } else {
+                fadeOut();
+            }
+        }
+    };
+
     public VirtualController(final ControllerHandler controllerHandler, FrameLayout layout, final Context context) {
         this.controllerHandler = controllerHandler;
         this.frame_layout = layout;
         this.context = context;
         this.handler = new Handler(Looper.getMainLooper());
         this.layout = OscStore.load(context);
+        this.floating = new FloatingSticks(context, this);
 
         // The glass controls draw their shadow and glow outside their bounds
         frame_layout.setClipChildren(false);
@@ -99,6 +128,13 @@ public class VirtualController {
                 beginEditing(true, null);
             }
         });
+        buttonConfigure.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                onUserTouch();
+                return false;
+            }
+        });
 
     }
 
@@ -107,30 +143,46 @@ public class VirtualController {
     }
 
     public void hide() {
+        hidden = true;
+        cancelIdle();
+        faded = false;
+        floating.releaseAll(false);
         for (VirtualControllerElement element : elements) {
+            element.animate().cancel();
             element.setVisibility(View.INVISIBLE);
         }
+        buttonConfigure.animate().cancel();
 
         buttonConfigure.setVisibility(View.INVISIBLE);
     }
 
     public void show() {
+        hidden = false;
         // Controls the player hid stay hidden
         relayout();
 
+        buttonConfigure.setAlpha(0.25f);
         buttonConfigure.setVisibility(editor == null ? View.VISIBLE : View.GONE);
+        restartIdle();
     }
 
     public void removeElements() {
+        cancelIdle();
+        faded = false;
+        floating.releaseAll(false);
+        frame_layout.removeView(floating);
         if (editor != null) {
             frame_layout.removeView(editor);
             editor = null;
         }
         for (VirtualControllerElement element : elements) {
+            element.animate().cancel();
             frame_layout.removeView(element);
         }
         elements.clear();
 
+        buttonConfigure.animate().cancel();
+        buttonConfigure.setAlpha(0.25f);
         frame_layout.removeView(buttonConfigure);
     }
 
@@ -165,6 +217,19 @@ public class VirtualController {
         }
         appliedWidth = frame_layout.getWidth();
         appliedHeight = frame_layout.getHeight();
+        if (arranging) {
+            // The editor shows everything at full strength
+            cancelIdle();
+            if (faded) {
+                faded = false;
+                for (VirtualControllerElement element : elements) {
+                    element.animate().cancel();
+                }
+            }
+        }
+        if (!isFloatingActive()) {
+            floating.releaseAll(false);
+        }
         OscGeometry.apply(this, frame_layout, w, h, layout, arranging);
         if (editor != null) {
             editor.invalidate();
@@ -217,6 +282,10 @@ public class VirtualController {
         arranging = on;
         currentMode = on ? ControllerMode.MoveButtons : ControllerMode.Active;
         relayout();
+        if (!on) {
+            // Back from arranging (to "Try it"): the idle wait starts over
+            restartIdle();
+        }
     }
 
 
@@ -254,10 +323,103 @@ public class VirtualController {
         params.topMargin = 15;
         frame_layout.addView(buttonConfigure, params);
 
+        // The floating-stick layer sits just above the stream and below every control and overlay button
+        View stream = frame_layout.findViewById(R.id.surfaceView);
+        frame_layout.addView(floating, stream != null ? frame_layout.indexOfChild(stream) + 1 : frame_layout.getChildCount(),
+                new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
         // Rebuild from the player's saved layout
         layout = OscStore.load(context);
         VirtualControllerConfigurationLoader.createDefaultLayout(this, context);
         relayout();
+        restartIdle();
+    }
+
+    /** True while touches on empty screen spawn floating sticks (the fixed sticks are hidden then). */
+    public boolean isFloatingActive() {
+        return layout.getFloatingSticks() && !arranging && !hidden;
+    }
+
+    /** True while a floating stick (by element id) is out or fading, so the layout leaves its view alone. */
+    public boolean isFloatingStickOut(int elementId) {
+        return floating.isOut(elementId);
+    }
+
+    /** True while the pad is faded out by the idle timer: the layout must not bring the opacity back. */
+    public boolean isFaded() {
+        return faded;
+    }
+
+    /** Any touch on the screen, on a control or not: brings a faded pad back and restarts the idle timer. */
+    public void onUserTouch() {
+        lastTouchTime = SystemClock.uptimeMillis();
+        if (faded) {
+            fadeIn();
+        } else if (!idlePosted && canFade()) {
+            postIdle(layout.getFadeAfter() * 1000L);
+        }
+    }
+
+    /** As {@link #onUserTouch()}, and remembers whether a finger is still down on the stream (the pad stays then). */
+    public void onUserTouch(MotionEvent event) {
+        int action = event.getActionMasked();
+        streamHeld = !(action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL ||
+                (action == MotionEvent.ACTION_POINTER_UP && event.getPointerCount() <= 2));
+        onUserTouch();
+    }
+
+    private boolean canFade() {
+        // Not while arranging (the editor shows everything at full strength); "Try it" does fade, like the stream
+        return layout.getFadeAfter() > 0 && !arranging && !hidden && !elements.isEmpty();
+    }
+
+    private boolean isTouchHeld() {
+        if (streamHeld || floating.hasActive()) {
+            return true;
+        }
+        for (VirtualControllerElement element : elements) {
+            if (element.isTouching()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void postIdle(long delay) {
+        handler.removeCallbacks(idleRunnable);
+        idlePosted = true;
+        handler.postDelayed(idleRunnable, delay);
+    }
+
+    private void cancelIdle() {
+        handler.removeCallbacks(idleRunnable);
+        idlePosted = false;
+    }
+
+    private void restartIdle() {
+        lastTouchTime = SystemClock.uptimeMillis();
+        if (canFade()) {
+            postIdle(layout.getFadeAfter() * 1000L);
+        } else {
+            cancelIdle();
+        }
+    }
+
+    private void fadeOut() {
+        faded = true;
+        for (VirtualControllerElement element : elements) {
+            element.animate().alpha(0f).setDuration(FADE_OUT_MS);
+        }
+        buttonConfigure.animate().alpha(0f).setDuration(FADE_OUT_MS);
+    }
+
+    private void fadeIn() {
+        faded = false;
+        for (VirtualControllerElement element : elements) {
+            element.animate().alpha(layout.getOpacity()).setDuration(FADE_IN_MS);
+        }
+        buttonConfigure.animate().alpha(0.25f).setDuration(FADE_IN_MS);
+        restartIdle();
     }
 
     public ControllerMode getControllerMode() {

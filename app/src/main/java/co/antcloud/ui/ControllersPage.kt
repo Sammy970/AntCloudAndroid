@@ -53,12 +53,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Controllers tab: check a controller before playing. A drawn controller mirrors every press, stick and
+ * Controls tab (controller check half): check a controller before playing. A drawn controller mirrors every press, stick and
  * trigger; the card says whether Moonlight will send it to the cloud PC, with a vibration test, the
  * diagnostics report and Moonlight's own controller settings. The same check as the Mac app's Controllers pane.
  */
 @Composable
-fun ControllersPage() {
+fun ControllersPage(header: @Composable () -> Unit = {}) {
     val activity = LocalContext.current as ComponentActivity
     val scope = rememberCoroutineScope()
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -87,8 +87,9 @@ fun ControllersPage() {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        header()
         Column(Modifier.padding(horizontal = 4.dp)) {
-            Text("Check your controller", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text("Controller check", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text("Press its buttons and move the sticks: everything that reaches this device lights up here, so you know it'll work before you start the cloud PC.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant)

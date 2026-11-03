@@ -21,7 +21,8 @@ enum class OscElement(val title: String, val x: Float, val y: Float) {
     FACE("A B X Y buttons", 0.85f, 0.73f),
     BACK("Back", 0.27f, 0.07f),
     START("Start", 0.73f, 0.07f),
-    GUIDE("Guide", 0.50f, 0.07f),
+    // Below the editor's pill and hint, which take the top centre.
+    GUIDE("Guide", 0.50f, 0.26f),
     LB("Left bumper (LB)", 0.165f, 0.37f),
     RB("Right bumper (RB)", 0.835f, 0.37f),
     LT("Left trigger (LT)", 0.10f, 0.25f),
@@ -34,12 +35,19 @@ enum class OscElement(val title: String, val x: Float, val y: Float) {
 
 data class OscItem(val x: Float, val y: Float, val scale: Float = 1f, val hidden: Boolean = false)
 
-class OscLayout(var opacity: Float = DEFAULT_OPACITY, val items: MutableMap<String, OscItem> = mutableMapOf()) {
+class OscLayout(
+    var opacity: Float = DEFAULT_OPACITY,
+    val items: MutableMap<String, OscItem> = mutableMapOf(),
+    /** Touch anywhere on the left or right half of the screen and a stick appears under the finger. The fixed sticks are hidden then. */
+    var floatingSticks: Boolean = false,
+    /** Seconds without a touch before the pad fades out; 0 keeps it always visible. */
+    var fadeAfter: Int = 0,
+) {
     fun item(e: OscElement) = items[e.key] ?: OscItem(e.x, e.y)
     fun set(e: OscElement, item: OscItem) { items[e.key] = item }
-    val isDefault get() = items.isEmpty() && opacity == DEFAULT_OPACITY
+    val isDefault get() = items.isEmpty() && opacity == DEFAULT_OPACITY && !floatingSticks && fadeAfter == 0
 
-    fun toJson(): String = JSONObject().put("opacity", opacity.toDouble()).put("items", JSONObject().also { o ->
+    fun toJson(): String = JSONObject().put("opacity", opacity.toDouble()).put("floatingSticks", floatingSticks).put("fadeAfter", fadeAfter).put("items", JSONObject().also { o ->
         items.forEach { (k, v) -> o.put(k, JSONObject().put("x", v.x.toDouble()).put("y", v.y.toDouble()).put("scale", v.scale.toDouble()).put("hidden", v.hidden)) }
     }).toString()
 
@@ -49,10 +57,17 @@ class OscLayout(var opacity: Float = DEFAULT_OPACITY, val items: MutableMap<Stri
         const val MAX_SCALE = 1.8f
         const val MIN_OPACITY = 0.3f
         const val MAX_OPACITY = 1f
+        /** The idle times the Controls screen offers, in seconds (0 = never fade). */
+        val FADE_CHOICES = listOf(0, 5, 10, 20)
 
+        /** Layouts saved before the new fields existed have no keys for them: they fall back to the defaults. */
         fun fromJson(text: String): OscLayout {
             val json = JSONObject(text)
-            val layout = OscLayout(json.optDouble("opacity", DEFAULT_OPACITY.toDouble()).toFloat().coerceIn(MIN_OPACITY, MAX_OPACITY))
+            val layout = OscLayout(
+                json.optDouble("opacity", DEFAULT_OPACITY.toDouble()).toFloat().coerceIn(MIN_OPACITY, MAX_OPACITY),
+                floatingSticks = json.optBoolean("floatingSticks", false),
+                fadeAfter = json.optInt("fadeAfter", 0).let { if (it in FADE_CHOICES) it else 0 },
+            )
             val items = json.optJSONObject("items") ?: return layout
             for (e in OscElement.entries) {
                 val o = items.optJSONObject(e.key) ?: continue
@@ -171,7 +186,13 @@ object OscGeometry {
         val density = container.resources.displayMetrics.density
         val f = deviceFactor(container.context)
         val area = area(container, width, height)
+        // Floating sticks replace the fixed ones (unless a floating one is out right now, which owns its view)
+        val floating = controller.isFloatingActive()
         for (view in controller.elements) {
+            if (floating && (view.elementId == E.EID_LS || view.elementId == E.EID_RS)) {
+                if (!controller.isFloatingStickOut(view.elementId)) view.visibility = View.GONE
+                continue
+            }
             val e = element(view.elementId)
             val item = layout.item(e)
             val (cx, cy) = center(e, item, area, f, density)
@@ -183,7 +204,7 @@ object OscGeometry {
             lp.topMargin = (cy + part.rect.top).toInt()
             view.layoutParams = lp
             view.visibility = if (arranging || !item.hidden) View.VISIBLE else View.GONE
-            view.alpha = if (arranging) (if (item.hidden) 0.3f else 1f) else layout.opacity
+            view.alpha = if (arranging) (if (item.hidden) 0.3f else 1f) else if (controller.isFaded()) 0f else layout.opacity
         }
     }
 

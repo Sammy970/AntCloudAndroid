@@ -107,7 +107,7 @@ Settings lock while you're streaming. The app follows your phone's light or dark
       <picture><source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/dark-controllers.png"><img src=".github/screenshots/light-controllers.png" width="100%" alt="Controllers tab: a drawn Xbox controller with the A button and right bumper lit, the right trigger at 70%, and a Ready to play badge"></picture>
     </td>
     <td width="60%" valign="top">
-      <p>The <b>Controllers</b> tab shows whether a controller will work before you start the cloud PC.</p>
+      <p>The controller check (on the <b>Controls</b> tab) shows whether a controller will work before you start the cloud PC.</p>
       <ul>
         <li><b>A drawn controller that mirrors yours:</b> buttons light up as you press them, the sticks move with yours and the triggers fill as you pull them. Labels follow the controller: A B X Y, or ✕ ○ □ △ on PlayStation.</li>
         <li><b>Ready to play, or not:</b> the same test Moonlight uses when a stream starts, with what to try if a controller won't be sent to the cloud PC.</li>
@@ -119,20 +119,44 @@ Settings lock while you're streaming. The app follows your phone's light or dark
 
 ## Glass on-screen controls, placed where you want them
 
+<p align="center">
+  <img src=".github/screenshots/controls-editor.png" width="100%" alt="The controls editor in landscape: a glass gamepad over a sunset, the A B X Y buttons selected with a dashed outline, a small pill at the top centre holding a menu and Done, and a sliders button at the top right">
+</p>
+
+The touch gamepad is drawn as smoky glass: an A B X Y diamond, a D-pad made of four separate pieces, tilted LT, LB, RT and RB buttons,
+Back, Start and Guide pills, LS and RS buttons and big stick rings. Pressed buttons light up AntCloud blue. The editor keeps out of the way:
+a small pill at the top, the controls themselves in the clear, and a faint blue tint while you edit.
+
+- **Where:** **Controls → Customize layout** (no cloud PC needed), or the gear button at the top-left during a stream.
+- **Move:** drag any control. It snaps to the centre lines of the other controls and the screen, with a guide line.
+- **Resize:** pinch a control, or use the **sliders button** at the top right for **Size** and **Opacity**.
+- **Remove:** drag a control onto the **bin** at the bottom. Removed controls wait in the tray next to it, and a tap puts one back.
+- **Overlaps** get a red outline, so you can tell when two controls sit on top of each other.
+- **The ··· menu** has **Try it** (press the controls to see how they react; nothing is sent to the cloud PC) and **Reset layout**.
+
 <table>
   <tr>
-    <td width="50%"><img src=".github/screenshots/controls-editor.png" width="100%" alt="The controls editor: a glass gamepad over a sunset, the D-pad selected with a dashed outline and a panel with Size and Opacity sliders and Hide, Reset and Done buttons"></td>
-    <td width="50%"><img src=".github/screenshots/controls-try.png" width="100%" alt="Try it mode: the same glass gamepad, ready to press without sending anything to the cloud PC"></td>
+    <td width="50%"><img src=".github/screenshots/controls-tray.png" width="100%" alt="The editor with the left and right bumpers removed: a tray at the bottom with a bin and two chips, + LB and + RB, to put them back"><br><sub>Removed controls sit in the tray until you put them back.</sub></td>
+    <td width="50%"><img src=".github/screenshots/controls-try.png" width="100%" alt="Try it mode: the A button lit in blue, ready to press without sending anything to the cloud PC"><br><sub>Try it: pressed controls light up.</sub></td>
   </tr>
 </table>
 
-The touch gamepad is drawn as smoky glass: an A B X Y diamond, a D-pad made of four separate pieces, tilted LT, LB, RT and RB buttons,
-Back and Start pills, LS and RS buttons and big stick rings. Pressed buttons light up AntCloud blue.
+### Floating sticks and fading controls
 
-- **Move and resize:** drag any control, then use **Size** to make it bigger or smaller. Guide lines help you line things up.
-- **Hide and fade:** hide the controls you don't use and set how see-through the whole gamepad is.
-- **Try it:** press the controls to see how they react. Nothing is sent to the cloud PC.
-- **Where:** Settings → Stream → **Customize on-screen controls** (no cloud PC needed), or the gear button at the top-left during a stream.
+<table>
+  <tr>
+    <td width="40%" valign="top">
+      <picture><source media="(prefers-color-scheme: dark)" srcset=".github/screenshots/dark-controls.png"><img src=".github/screenshots/light-controls.png" width="100%" alt="The Controls tab: a Floating sticks switch, Fade controls when idle with Off, 5 s, 10 s and 20 s, Customize layout and the controller check"></picture>
+    </td>
+    <td width="60%" valign="top">
+      <p>Both live on the <b>Controls</b> tab, next to everything else about input.</p>
+      <ul>
+        <li><b>Floating sticks:</b> touch anywhere on the left or right half of the screen and a stick appears under your finger. Both thumbs work at once, and the stick keeps working if your thumb slides outside it. Buttons still win when you touch one. The fixed sticks are hidden while this is on.</li>
+        <li><b>Fade when idle:</b> the gamepad fades out after 5, 10 or 20 seconds without a touch, and comes back on the next one. Faded controls still respond.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
 ## Features
 
@@ -145,10 +169,11 @@ Back and Start pills, LS and RS buttons and big stick rings. Pressed buttons lig
   instead of booting the PC, and ends the session at the plan's cutoff like the official client.
 - **Network check** without starting the cloud PC, with a verdict and a bitrate suggestion for your settings.
 - **Typing during a stream:** a keyboard button in the corner of the stream opens your phone's keyboard (a three-finger tap does too).
-- **Controller check** (the Controllers tab): a drawn controller mirrors every press, stick and trigger live, says whether the cloud PC
+- **Controller check** (the Controls tab): a drawn controller mirrors every press, stick and trigger live, says whether the cloud PC
   will get it as a controller, and has a vibration test. If a controller doesn't work, it can share a diagnostics report with Moonlight's
   log, and Moonlight's own controller settings are one tap away.
-- **Glass on-screen controls** you can move, resize, hide and fade, with a Try it mode.
+- **Glass on-screen controls** you can move, resize, remove and fade, with floating sticks that appear under your thumb and a Try it mode.
+- **A Controls tab of its own:** floating sticks, fade when idle, the layout editor and the controller check, apart from the stream settings.
 - **Motion with a purpose:** the monitor powers on, the track fills step by step, and a failed sign-in shakes.
 
 ## Download
@@ -211,8 +236,9 @@ adb shell am start -S -n com.samyakjain.antcloud.debug/co.antcloud.ui.AntCloudAc
 
 | Extra | Values |
 |---|---|
-| `preview` | `login`, `home:idle`, `home:queued`, `home:booting`, `home:ready`, `home:pairing`, `home:streaming`. Add `:stream`, `:network`, `:controllers`, `:about`, `:notice` or `:upstream`, and `:sample` for a sample controller. |
+| `preview` | `login`, `home:idle`, `home:queued`, `home:booting`, `home:ready`, `home:pairing`, `home:streaming`. Add `:stream`, `:network`, `:controls`, `:about`, `:notice` or `:upstream`, and `:sample` for a sample controller. |
 | `theme` | `light` or `dark` |
+| `home:ready:stream:osc` | Opens the controls editor. Add `--ez selected true` (face buttons selected), `--ez options true` (Size and Opacity card open), `--ez removed true` (LB and RB removed, so the tray shows) or `--ez try true` (Try it). |
 
 The network preview shows sample results, since the emulator's virtual network adds hundreds of milliseconds to a real run.
 

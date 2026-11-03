@@ -35,6 +35,7 @@ public abstract class VirtualControllerElement extends View {
     public static final int EID_GDB = 16;
 
     protected VirtualController virtualController;
+    private boolean touching = false;
     protected final int elementId;
 
     protected VirtualControllerElement(VirtualController controller, Context context, int elementId) {
@@ -59,8 +60,22 @@ public abstract class VirtualControllerElement extends View {
         return (int)(screen.heightPixels*0.004f);
     }
 
+    /** True while a finger is down on this control (the idle fade waits for it). */
+    public boolean isTouching() {
+        return touching;
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        // AntCloud: any touch brings a faded pad back
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            touching = true;
+        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            touching = false;
+        }
+        virtualController.onUserTouch();
+
         // Ignore secondary touches on controls
         //
         // NB: We can get an additional pointer down if the user touches a non-StreamView area

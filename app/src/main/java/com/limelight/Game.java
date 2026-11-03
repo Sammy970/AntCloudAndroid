@@ -2202,6 +2202,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouch(View view, MotionEvent event) {
+        if (virtualController != null) {
+            virtualController.onUserTouch(event); // AntCloud: wakes a faded gamepad
+        }
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             // Tell the OS not to buffer input events for us
             //

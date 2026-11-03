@@ -106,9 +106,13 @@ class AntCloudActivity : ComponentActivity() {
         if ("upstream" in parts) UpstreamStatus.preview(0.017, null)
         if ("network" in parts) AppState.network.preview()
         if ("sample" in parts) Diagnostics.previewPad()
-        // `home:ready:stream:osc` opens the on-screen controls editor; `--es select dpad` and `--ez try true` pass through.
+        // `home:ready:stream:osc` opens the on-screen controls editor; `--es select dpad` and `--ez try true` pass through,
+        // as do `--ez selected true` (face buttons selected), `--ez options true` (Appearance card open) and `--ez removed true`
+        // (LB and RB removed, so the tray shows).
         if ("osc" in parts) startActivity(Intent(this, co.antcloud.osc.OscEditorActivity::class.java)
-            .putExtra("select", intent.getStringExtra("select")).putExtra("try", intent.getBooleanExtra("try", false)))
+            .putExtra("select", intent.getStringExtra("select")).putExtra("try", intent.getBooleanExtra("try", false))
+            .putExtra("selected", intent.getBooleanExtra("selected", false)).putExtra("options", intent.getBooleanExtra("options", false))
+            .putExtra("removed", intent.getBooleanExtra("removed", false)))
     }
 }
 

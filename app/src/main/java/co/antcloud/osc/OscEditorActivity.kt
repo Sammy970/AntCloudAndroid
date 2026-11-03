@@ -11,7 +11,8 @@ import com.limelight.binding.input.virtual_controller.VirtualController
 
 /**
  * Customize on-screen controls without a PC: the glass editor over a preview backdrop. Reached from the panel's
- * Stream settings. Debug extras for screenshots: `--es select dpad` picks a control, `--ez try true` opens "Try it".
+ * Stream settings. Debug extras for screenshots: `--es select dpad` picks a control, `--ez selected true` selects the face buttons,
+ * `--ez options true` opens the Appearance card, `--ez removed true` removes LB and RB (tray), `--ez try true` opens "Try it".
  */
 class OscEditorActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,6 +36,9 @@ class OscEditorActivity : Activity() {
             controller.beginEditing(true) { finish() }
             val overlay = root.getChildAt(root.childCount - 1) as? OscEditorOverlay
             intent.getStringExtra("select")?.let { name -> overlay?.preselect(OscElement.entries.firstOrNull { it.key == name }) }
+            if (intent.getBooleanExtra("selected", false)) overlay?.preselect(OscElement.FACE)
+            if (intent.getBooleanExtra("removed", false)) overlay?.previewRemoved(OscElement.LB, OscElement.RB)
+            if (intent.getBooleanExtra("options", false)) overlay?.showOptions(true)
             if (intent.getBooleanExtra("try", false)) overlay?.setTrying(true)
         }
     }
