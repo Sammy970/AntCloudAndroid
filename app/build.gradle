@@ -14,8 +14,8 @@ android {
         targetSdk 36
 
         // AntCloud: our version (0.<AntCloud release>.<ours>, as in Config.APP_VERSION) on Moonlight 12.2.
-        versionName "0.16.7"
-        versionCode = 1607
+        versionName "0.16.8"
+        versionCode = 1608
 
         // Generate native debug symbols to allow Google Play to symbolicate our native crashes
         ndk.debugSymbolLevel = 'FULL'
