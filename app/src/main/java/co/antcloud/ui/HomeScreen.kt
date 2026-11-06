@@ -8,10 +8,23 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.semantics.Role
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -101,6 +114,11 @@ fun HomeScreen(bridge: MoonlightBridge, initialTab: String?) {
     var tab by rememberSaveable { mutableStateOf(Tab.entries.firstOrNull { it.name.equals(initialTab, true) || (it == Tab.CONTROLLERS && initialTab.equals("controls", true)) } ?: Tab.CLOUD) }
     val phase by AppState.session.phase.collectAsState()
 
+    if (LocalIsTv.current) {
+        TvHome(tab, { tab = it }, bridge)
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -134,7 +152,7 @@ fun HomeScreen(bridge: MoonlightBridge, initialTab: String?) {
                 Tab.CLOUD -> CloudPcPage(bridge) { tab = Tab.STREAM }
                 Tab.STREAM -> StreamPage()
                 Tab.NETWORK -> NetworkPage()
-                Tab.CONTROLLERS -> ControllersPage(header = { OnScreenControlsSection() })
+                Tab.CONTROLLERS -> ControllersPage(header = { if (!LocalIsTv.current) OnScreenControlsSection() })
                 Tab.ABOUT -> AboutPage()
             }
         }
@@ -147,6 +165,12 @@ private fun AccountMenu() {
     val profile by AppState.auth.profile.collectAsState()
     val scope = rememberCoroutineScope()
     var open by remember { mutableStateOf(false) }
+    if (LocalIsTv.current) {
+        TvAccountMenu(open, { open = it }, profile?.initial ?: "", profile?.firstName, profile?.email,
+            onRefresh = { scope.launch { AppState.auth.reloadProfile() } }, onPricing = { activity.openUrl(Config.PRICING_URL) },
+            onSignOut = { AppState.session.shutDown(); AppState.auth.logout() })
+        return
+    }
     Box {
         IconButton({ open = true }) { Avatar(profile?.initial ?: "", 32) }
         DropdownMenu(open, { open = false }) {
@@ -188,14 +212,36 @@ private fun detailText(phase: Phase) = when (phase) {
 
 /** Play-first: the drawn display shows the session state, the track shows progress, one next action. */
 @Composable
-private fun CloudPcPage(bridge: MoonlightBridge, editSettings: () -> Unit) {
-    val activity = LocalContext.current as ComponentActivity
+private fun CloudPcPage(bridge: MoonlightBridge, holdFocus: Boolean = false, editSettings: () -> Unit) {
+    val tv = LocalIsTv.current
     val session = AppState.session
     val phase by session.phase.collectAsState()
     val position by session.queuePosition.collectAsState()
     val settings by AppState.settings.collectAsState()
     val profile by AppState.auth.profile.collectAsState()
-    val scope = rememberCoroutineScope()
+
+    if (tv) {
+        // The primary action (Start / Launch / Cancel) takes focus, and again whenever the phase swaps it for another button.
+        val primary = remember { FocusRequester() }
+        LaunchedEffect(phase) { if (!holdFocus) runCatching { primary.requestFocus() } }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            UpstreamBanner(Modifier.padding(bottom = 12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(0.8f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    DisplayHero(phase, position, Modifier.widthIn(max = 270.dp).fillMaxWidth())
+                    PlanCard(profile, Modifier.fillMaxWidth())
+                }
+                Column(Modifier.weight(1.2f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    StatusText(phase, position, Alignment.Start, TextAlign.Start)
+                    ConnectionTrack(phase, Modifier.widthIn(max = 440.dp).fillMaxWidth().padding(vertical = 18.dp))
+                    ActionBlock(bridge, primary)
+                    SettingsSummary(settings, editSettings, Modifier.padding(top = 10.dp))
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+        return
+    }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp),
@@ -203,72 +249,97 @@ private fun CloudPcPage(bridge: MoonlightBridge, editSettings: () -> Unit) {
     ) {
         UpstreamBanner(Modifier.widthIn(max = 520.dp).padding(bottom = 16.dp))
         DisplayHero(phase, position, Modifier.widthIn(max = 340.dp).fillMaxWidth().padding(top = 8.dp, bottom = 28.dp))
-
-        AnimatedContent(phase to position, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "status") { (p, pos) ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(statusText(p, pos), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(6.dp))
-                Text(detailText(p), color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-            }
-        }
+        StatusText(phase, position, Alignment.CenterHorizontally, TextAlign.Center)
         ConnectionTrack(phase, Modifier.widthIn(max = 400.dp).fillMaxWidth().padding(vertical = 24.dp))
-
-        // Actions
-        when (phase) {
-            Phase.IDLE -> PrimaryAction("Start Cloud PC", AcIcons.Power) {
-                val p = profile
-                if (p == null || !p.hasPaidPlan) {
-                    session.showNotice("Plan Required", "Please buy a plan to continue.")
-                    activity.openUrl(Config.PRICING_URL)
-                } else {
-                    scope.launch { session.startIfAllowed(settings, p.isNightPlan) }
-                }
-            }
-            Phase.READY -> {
-                PrimaryAction("Launch Stream", AcIcons.Play) { session.launchStream(settings, bridge) }
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton({ session.applySettings(settings) }) { Text("Apply Settings to PC") }
-                    OutlinedButton({ session.shutDown() }) { Text("Shut Down", color = BadRed) }
-                }
-            }
-            else -> OutlinedButton({ session.shutDown() }, Modifier.widthIn(min = 140.dp)) {
-                Text(if (phase.isBusy) "Cancel" else "Shut Down", color = BadRed)
-            }
-        }
-
-        Row(Modifier.padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(settings.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(editSettings) { Text("Change…") }
-        }
-
-        profile?.let {
-            if (it.minutesLeft != null) {
-                Card(Modifier.widthIn(max = 520.dp).fillMaxWidth().padding(top = 20.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(it.initial, 40)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(it.firstName, fontWeight = FontWeight.SemiBold)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(if (it.isNightPlan) AcIcons.Moon else AcIcons.Star, null, Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(Modifier.width(5.dp))
-                                Text(it.planName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(14.dp))
-                    PlanUsage(it)
-                }
-            }
-        }
+        ActionBlock(bridge, null)
+        SettingsSummary(settings, editSettings, Modifier.padding(top = 14.dp))
+        PlanCard(profile, Modifier.widthIn(max = 520.dp).fillMaxWidth().padding(top = 20.dp))
         Spacer(Modifier.height(24.dp))
     }
 }
 
 @Composable
-private fun PrimaryAction(title: String, icon: ImageVector, onClick: () -> Unit) {
-    Button(onClick, Modifier.width(240.dp).height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = AntBlue, contentColor = Color.White)) {
+private fun StatusText(phase: Phase, position: Int?, horizontal: Alignment.Horizontal, align: TextAlign) {
+    AnimatedContent(phase to position, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "status") { (p, pos) ->
+        Column(horizontalAlignment = horizontal) {
+            Text(statusText(p, pos), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, textAlign = align)
+            Spacer(Modifier.height(6.dp))
+            Text(detailText(p), color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = align)
+        }
+    }
+}
+
+/** Start / Launch / Cancel, the one next action. [primary] (TV) marks the first button so focus can start there. */
+@Composable
+private fun ColumnScope.ActionBlock(bridge: MoonlightBridge, primary: FocusRequester?) {
+    val activity = LocalContext.current as ComponentActivity
+    val session = AppState.session
+    val phase by session.phase.collectAsState()
+    val settings by AppState.settings.collectAsState()
+    val profile by AppState.auth.profile.collectAsState()
+    val scope = rememberCoroutineScope()
+    val tv = LocalIsTv.current
+    val first = if (primary != null) Modifier.focusRequester(primary) else Modifier
+    when (phase) {
+        Phase.IDLE -> PrimaryAction("Start Cloud PC", AcIcons.Power, first) {
+            val p = profile
+            if (p == null || !p.hasPaidPlan) {
+                session.showNotice("Plan Required", "Please buy a plan to continue.")
+                activity.openUrl(Config.PRICING_URL)
+            } else {
+                scope.launch { session.startIfAllowed(settings, p.isNightPlan) }
+            }
+        }
+        Phase.READY -> {
+            PrimaryAction("Launch Stream", AcIcons.Play, first) { session.launchStream(settings, bridge) }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(if (tv) 16.dp else 8.dp)) {
+                FilledTonalButton({ session.applySettings(settings) }, Modifier.tvFocus(50.dp).heightIn(min = tvOr(52.dp))) { Text("Apply Settings to PC") }
+                OutlinedButton({ session.shutDown() }, Modifier.tvFocus(50.dp).heightIn(min = tvOr(52.dp))) { Text("Shut Down", color = BadRed) }
+            }
+        }
+        else -> OutlinedButton({ session.shutDown() }, Modifier.then(first).tvFocus(50.dp).widthIn(min = 140.dp).heightIn(min = tvOr(52.dp))) {
+            Text(if (phase.isBusy) "Cancel" else "Shut Down", color = BadRed)
+        }
+    }
+}
+
+@Composable
+private fun SettingsSummary(settings: StreamSettings, editSettings: () -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(settings.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(editSettings, Modifier.tvFocus(50.dp).heightIn(min = tvOr(48.dp))) { Text("Change…") }
+    }
+}
+
+@Composable
+private fun PlanCard(profile: co.antcloud.api.UserProfile?, modifier: Modifier) {
+    profile?.let {
+        if (it.minutesLeft != null) {
+            Card(modifier) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Avatar(it.initial, 40)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(it.firstName, fontWeight = FontWeight.SemiBold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(if (it.isNightPlan) AcIcons.Moon else AcIcons.Star, null, Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(5.dp))
+                            Text(it.planName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                PlanUsage(it)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrimaryAction(title: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val tv = LocalIsTv.current
+    Button(onClick, modifier.tvFocus(50.dp).width(if (tv) 300.dp else 240.dp).height(if (tv) 60.dp else 52.dp), colors = ButtonDefaults.buttonColors(containerColor = AntBlue, contentColor = Color.White)) {
         Icon(icon, null, Modifier.size(17.dp))
         Spacer(Modifier.width(8.dp))
         Text(title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
@@ -277,7 +348,16 @@ private fun PrimaryAction(title: String, icon: ImageVector, onClick: () -> Unit)
 
 @Composable
 private fun Card(modifier: Modifier = Modifier, padding: PaddingValues = PaddingValues(18.dp), content: @Composable () -> Unit) {
-    Surface(modifier, shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer,
+    val shape = RoundedCornerShape(20.dp)
+    if (LocalIsTv.current) {
+        // A Surface clips its content, which would cut the focus ring of the rows inside it.
+        Box(modifier.background(MaterialTheme.colorScheme.surfaceContainer, shape)
+            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f), shape)) {
+            Column(Modifier.padding(padding)) { content() }
+        }
+        return
+    }
+    Surface(modifier, shape = shape, color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))) {
         Column(Modifier.padding(padding)) { content() }
     }
@@ -302,8 +382,12 @@ fun UpstreamBanner(modifier: Modifier = Modifier) {
                 Text(title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                 Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (route == null) Icon(AcIcons.Close, "Dismiss", Modifier.size(16.dp).clickable { UpstreamStatus.dismissVersionNotice() },
-                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (route == null) {
+                if (LocalIsTv.current) Box(Modifier.size(48.dp).tvClickable(24.dp) { UpstreamStatus.dismissVersionNotice() }, contentAlignment = Alignment.Center) {
+                    Icon(AcIcons.Close, "Dismiss", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else Icon(AcIcons.Close, "Dismiss", Modifier.size(16.dp).clickable { UpstreamStatus.dismissVersionNotice() },
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -317,8 +401,8 @@ private fun StreamPage() {
     val locked = phase == Phase.PAIRING || phase == Phase.STREAMING
     fun update(change: (StreamSettings) -> StreamSettings) { if (!locked) AppState.updateSettings(change) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val tv = LocalIsTv.current
+    PageColumn(8.dp, 16.dp, 8.dp) {
         if (locked) Card(padding = PaddingValues(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(AcIcons.Lock, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -327,7 +411,7 @@ private fun StreamPage() {
             }
         }
 
-        Section("Display", "Streams at ${settings.pixelSize}. 16:10 and 21:9 suit tablets and wide phones.")
+        Section("Display", if (tv) "Streams at ${settings.pixelSize}." else "Streams at ${settings.pixelSize}. 16:10 and 21:9 suit tablets and wide phones.")
         Card {
             Label("Resolution")
             Segments(listOf("720p" to "720", "1080p" to "1080", "1440p" to "1440", "4K" to "2160"), settings.resolution, locked) { v -> update { it.copy(resolution = v) } }
@@ -350,10 +434,10 @@ private fun StreamPage() {
 
         Section("Codec", null)
         Card {
-            ToggleRow("HEVC (H.265)", "Sharper picture at the same bitrate, when your phone decodes it well.", settings.hevc, locked) { v -> update { it.copy(hevc = v) } }
+            ToggleRow("HEVC (H.265)", if (tv) "Sharper picture at the same bitrate, when your TV decodes it well." else "Sharper picture at the same bitrate, when your phone decodes it well.", settings.hevc, locked) { v -> update { it.copy(hevc = v) } }
         }
 
-        Section("Typing", "To type during a stream, tap the keyboard button in the bottom corner, or tap the screen with three fingers. Check your controller in the Controls tab.")
+        if (!tv) Section("Typing", "To type during a stream, tap the keyboard button in the bottom corner, or tap the screen with three fingers. Check your controller in the Controls tab.")
 
         Spacer(Modifier.height(16.dp))
     }
@@ -371,24 +455,19 @@ private fun Section(title: String, footer: String?) {
 private fun Label(text: String) = Text(text, Modifier.padding(bottom = 8.dp), style = MaterialTheme.typography.bodyLarge)
 
 @Composable
-private fun Segments(options: List<Pair<String, String>>, selected: String, locked: Boolean, onSelect: (String) -> Unit) {
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        options.forEachIndexed { i, (label, value) ->
-            SegmentedButton(selected = value == selected, onClick = { onSelect(value) }, enabled = !locked,
-                shape = SegmentedButtonDefaults.itemShape(i, options.size), icon = {}) { Text(label, maxLines = 1) }
-        }
-    }
-}
-
-@Composable
 private fun ToggleRow(title: String, detail: String, checked: Boolean, locked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    val tv = LocalIsTv.current
+    // On TV the whole row is the focus target and toggles on OK; the switch is only the picture of the state.
+    val rowModifier = if (tv) Modifier.fillMaxWidth().tvFocus(14.dp).clip(RoundedCornerShape(14.dp))
+        .toggleable(checked, role = Role.Switch, onValueChange = { if (!locked) onChange(it) }).heightIn(min = 64.dp).padding(horizontal = 12.dp, vertical = 8.dp)
+    else Modifier
+    Row(rowModifier, verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(12.dp))
-        Switch(checked, onChange, enabled = !locked)
+        if (tv) Switch(checked, null, enabled = !locked) else Switch(checked, onChange, enabled = !locked)
     }
 }
 
@@ -442,8 +521,26 @@ private fun NetworkPage() {
     val busy = phase == Phase.PAIRING || phase == Phase.STREAMING
     val scope = rememberCoroutineScope()
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    val tv = LocalIsTv.current
+    // On TV the Run button leads the page, so it takes focus first and the results below scroll into view.
+    val runRow: @Composable () -> Unit = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Button({ scope.launch { AppState.network.run() } }, Modifier.tvFocus(50.dp).heightIn(min = tvOr(56.dp, 50.dp)), enabled = !r.isRunning && !busy,
+                    colors = ButtonDefaults.buttonColors(containerColor = AntBlue, contentColor = Color.White)) {
+                    Icon(AcIcons.Gauge, null, Modifier.size(17.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (r.stage == NetworkCheck.Stage.IDLE) "Run Test" else "Run Again", fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.width(14.dp))
+                when {
+                    r.isRunning -> Text(if (r.stage == NetworkCheck.Stage.LATENCY) "Measuring latency…" else "Measuring download speed…",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    busy -> Text("Available when you're not streaming.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (r.isRunning) LinearProgressIndicator(Modifier.fillMaxWidth(), color = AntBlue)
+    }
+    PageColumn(14.dp, 16.dp, 8.dp) {
         Column(Modifier.padding(horizontal = 4.dp)) {
             Text("How would a stream feel right now?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
@@ -451,6 +548,7 @@ private fun NetworkPage() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
+        if (tv) runRow()
         Card {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("Latency", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
@@ -489,7 +587,7 @@ private fun NetworkPage() {
                     Text("Suggested for $res at ${settings.fps} FPS: ${suggested / 1000} Mbps", fontWeight = FontWeight.SemiBold)
                     Text(if (current == suggested) "That's what you're using." else "You're using ${current / 1000} Mbps.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (current != suggested) FilledTonalButton({ AppState.updateSettings { it.copy(bitrate = suggested.toString()) } }, Modifier.padding(top = 8.dp)) {
+                    if (current != suggested) FilledTonalButton({ AppState.updateSettings { it.copy(bitrate = suggested.toString()) } }, Modifier.padding(top = 8.dp).tvFocus(50.dp).heightIn(min = tvOr(52.dp))) {
                         Text("Use ${suggested / 1000} Mbps")
                     }
                 }
@@ -497,21 +595,7 @@ private fun NetworkPage() {
         }
         if (r.stage == NetworkCheck.Stage.FAILED) Text(r.failure.orEmpty(), color = WarnOrange)
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Button({ scope.launch { AppState.network.run() } }, Modifier.height(50.dp), enabled = !r.isRunning && !busy,
-                colors = ButtonDefaults.buttonColors(containerColor = AntBlue, contentColor = Color.White)) {
-                Icon(AcIcons.Gauge, null, Modifier.size(17.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(if (r.stage == NetworkCheck.Stage.IDLE) "Run Test" else "Run Again", fontWeight = FontWeight.SemiBold)
-            }
-            Spacer(Modifier.width(14.dp))
-            when {
-                r.isRunning -> Text(if (r.stage == NetworkCheck.Stage.LATENCY) "Measuring latency…" else "Measuring download speed…",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                busy -> Text("Available when you're not streaming.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        if (r.isRunning) LinearProgressIndicator(Modifier.fillMaxWidth(), color = AntBlue)
+        if (!tv) runRow()
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -544,8 +628,8 @@ private fun AboutPage() {
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = tvOr(0.dp, 20.dp), vertical = tvOr(8.dp, 12.dp)),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(tvOr(16.dp, 20.dp))) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Image(painterResource(R.drawable.antcloud_logo), null, Modifier.size(88.dp).clip(RoundedCornerShape(20.dp)))
             Text(Config.APP_NAME, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -560,7 +644,7 @@ private fun AboutPage() {
             }
         }
 
-        Card(Modifier.widthIn(max = 460.dp).fillMaxWidth()) {
+        Card(Modifier.widthIn(max = tvOr(640.dp, 460.dp)).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(64.dp).clip(CircleShape)) {
                     Avatar(Config.CREATOR_NAME.take(1), 64)
@@ -582,7 +666,7 @@ private fun AboutPage() {
             }
         }
 
-        Card(Modifier.widthIn(max = 460.dp).fillMaxWidth(), padding = PaddingValues(4.dp)) {
+        Card(Modifier.widthIn(max = tvOr(640.dp, 460.dp)).fillMaxWidth(), padding = PaddingValues(4.dp)) {
             LinkRow("Source code", Config.SOURCE_URL.removePrefix("https://"), AcIcons.Braces) { activity.openUrl(Config.SOURCE_URL) }
             HorizontalDivider(Modifier.padding(start = 56.dp))
             LinkRow("Streaming by Moonlight", "Open-source game streaming (GPLv3)", AcIcons.Play) { activity.openUrl(Config.MOONLIGHT_URL) }
@@ -596,8 +680,8 @@ private fun AboutPage() {
 
 @Composable
 private fun LinkTile(title: String, handle: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
-    Surface(onClick, modifier, shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Surface(onClick, modifier.tvFocus(14.dp), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(Modifier.heightIn(min = tvOr(56.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
@@ -611,7 +695,7 @@ private fun LinkTile(title: String, handle: String, icon: ImageVector, modifier:
 
 @Composable
 private fun LinkRow(title: String, detail: String, icon: ImageVector, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp),
+    Row(Modifier.fillMaxWidth().tvFocus(16.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick).heightIn(min = tvOr(64.dp)).padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically) {
         IconTile(icon, 30)
         Spacer(Modifier.width(12.dp))
@@ -623,3 +707,102 @@ private fun LinkRow(title: String, detail: String, icon: ImageVector, onClick: (
     }
 }
 
+
+// MARK: Android TV
+
+/**
+ * The TV home: a tab bar across the top (left/right moves between tabs and shows each one as focus lands on it, down enters the
+ * page, Back from any other tab returns to Cloud PC) and the page below, inside the 5% overscan margins set by [Root].
+ */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+@Composable
+private fun TvHome(tab: Tab, setTab: (Tab) -> Unit, bridge: MoonlightBridge) {
+    val phase by AppState.session.phase.collectAsState()
+    var tabsFocused by remember { mutableStateOf(false) }
+    BackHandler(enabled = tab != Tab.CLOUD) { setTab(Tab.CLOUD) }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 14.dp).onFocusChanged { tabsFocused = it.hasFocus }, verticalAlignment = Alignment.CenterVertically) {
+            Image(painterResource(R.drawable.antcloud_logo), null, Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)))
+            Spacer(Modifier.width(20.dp))
+            // Coming up from the page lands on the tab that is showing, not on whichever one sits above the button.
+            val selected = remember { FocusRequester() }
+            Row(Modifier.weight(1f).focusProperties { enter = { selected } }.focusGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Tab.entries.forEach { t ->
+                    val dot = if (t == Tab.CLOUD && phase != Phase.IDLE) (if (phase == Phase.READY || phase == Phase.STREAMING) GoodGreen else WarnOrange) else null
+                    TvTab(t, tab == t, dot, if (tab == t) Modifier.focusRequester(selected) else Modifier) { setTab(t) }
+                }
+            }
+            AccountMenu()
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            AnimatedContent(tab, Modifier.fillMaxSize(), transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "tab") { t ->
+                when (t) {
+                    Tab.CLOUD -> CloudPcPage(bridge, holdFocus = tabsFocused) { setTab(Tab.STREAM) }
+                    Tab.STREAM -> StreamPage()
+                    Tab.NETWORK -> NetworkPage()
+                    Tab.CONTROLLERS -> ControllersPage()
+                    Tab.ABOUT -> AboutPage()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvTab(t: Tab, selected: Boolean, dot: Color?, modifier: Modifier, onSelect: () -> Unit) {
+    Row(
+        modifier.tvFocus(50.dp).clip(CircleShape)
+            .background(if (selected) AntBlue.copy(alpha = 0.2f) else Color.Transparent)
+            .onFocusChanged { if (it.isFocused) onSelect() }
+            .clickable(onClick = onSelect)
+            .heightIn(min = 48.dp).padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+        Box {
+            Icon(t.icon, null, Modifier.size(22.dp), tint = if (selected) AntBlue else tint)
+            if (dot != null) Box(Modifier.align(Alignment.TopEnd).size(8.dp).clip(CircleShape).background(dot))
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(t.title, color = tint, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
+    }
+}
+
+/** The account button and its menu. A dialog rather than a dropdown, so focus, OK and Back behave; focus returns to the button. */
+@Composable
+private fun TvAccountMenu(
+    open: Boolean, setOpen: (Boolean) -> Unit, initial: String, name: String?, email: String?,
+    onRefresh: () -> Unit, onPricing: () -> Unit, onSignOut: () -> Unit,
+) {
+    val button = remember { FocusRequester() }
+    val first = remember { FocusRequester() }
+    var wasOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(open) {
+        if (wasOpen && !open) runCatching { button.requestFocus() }
+        wasOpen = open
+    }
+    Box(Modifier.focusRequester(button).tvClickable(50.dp) { setOpen(true) }.padding(6.dp)) { Avatar(initial, 40) }
+    if (open) Dialog({ setOpen(false) }) {
+        LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.widthIn(min = 380.dp)) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (name != null) {
+                    Text(name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+                    Text(email.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                }
+                TvMenuItem("Refresh account", Modifier.focusRequester(first)) { setOpen(false); onRefresh() }
+                TvMenuItem("Plans & pricing") { setOpen(false); onPricing() }
+                TvMenuItem("Sign out", color = BadRed) { setOpen(false); onSignOut() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvMenuItem(title: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified, onClick: () -> Unit) {
+    Box(modifier.fillMaxWidth().tvClickable(14.dp, onClick = onClick).heightIn(min = 56.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {
+        Text(title, color = color, style = MaterialTheme.typography.bodyLarge)
+    }
+}

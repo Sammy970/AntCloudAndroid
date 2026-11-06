@@ -1,12 +1,20 @@
 package co.antcloud.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -99,103 +107,141 @@ fun LoginScreen() {
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        Aurora(dark)
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).safeDrawingPadding().imePadding()
-                .padding(horizontal = 20.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+    val tv = LocalIsTv.current
+    // Sign in is the first stop when it can be used; with empty fields the method picker is, so no keyboard pops up unasked.
+    val signInFocus = remember { FocusRequester() }
+    val pickerFocus = remember { FocusRequester() }
+    if (tv) LaunchedEffect(Unit) { runCatching { (if (!phoneMode && email.isNotBlank() && password.isNotEmpty()) signInFocus else pickerFocus).requestFocus() } }
+
+    val hero: @Composable () -> Unit = {
+        // Hero
+        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Image(painterResource(R.drawable.antcloud_logo), null,
+                Modifier.padding(top = 12.dp).size(64.dp).shadow(18.dp, RoundedCornerShape(15.dp), spotColor = AntBlue, ambientColor = AntBlue).clip(RoundedCornerShape(15.dp)))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Your gaming PC,\nin the cloud.", fontSize = 34.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold)
+                Text(if (tv) "Start it, stream it, play. AntCloud on your TV, one click at a time." else "Start it, stream it, play. AntCloud on your phone, one tap at a time.",
+                    style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Feature(AcIcons.Power, "One tap to start your cloud PC")
+                Feature(AcIcons.Link, "Pairs with Moonlight on its own")
+                Feature(AcIcons.Tv, "Up to 4K and 120 FPS")
+            }
+        }
+    }
+
+    val card: @Composable () -> Unit = {
+        // Card
+        Surface(
+            Modifier.fillMaxWidth().graphicsLayer { translationX = shake.value * density }
+                .shadow(24.dp, RoundedCornerShape(28.dp), ambientColor = Color.Black.copy(alpha = 0.2f)),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.94f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
         ) {
-            Column(Modifier.widthIn(max = 460.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(28.dp)) {
-                // Hero
-                Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                    Image(painterResource(R.drawable.antcloud_logo), null,
-                        Modifier.padding(top = 12.dp).size(64.dp).shadow(18.dp, RoundedCornerShape(15.dp), spotColor = AntBlue, ambientColor = AntBlue).clip(RoundedCornerShape(15.dp)))
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Your gaming PC,\nin the cloud.", fontSize = 34.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold)
-                        Text("Start it, stream it, play. AntCloud on your phone, one tap at a time.",
-                            style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Feature(AcIcons.Power, "One tap to start your cloud PC")
-                        Feature(AcIcons.Link, "Pairs with Moonlight on its own")
-                        Feature(AcIcons.Tv, "Up to 4K and 120 FPS")
+            Column(Modifier.padding(if (tv) 18.dp else 22.dp), verticalArrangement = Arrangement.spacedBy(if (tv) 8.dp else 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                UpstreamBanner()
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Sign in", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                    if (!tv) Text("Use your AntCloud account.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (tv) Segments(listOf("Email" to "email", "Phone" to "phone"), if (phoneMode) "phone" else "email", busy, Modifier.focusRequester(pickerFocus)) { v ->
+                    phoneMode = v == "phone"; error = null; info = null
+                } else SingleChoiceSegmentedButtonRow {
+                    listOf("Email", "Phone").forEachIndexed { i, label ->
+                        SegmentedButton(selected = phoneMode == (i == 1), onClick = { phoneMode = i == 1; error = null; info = null },
+                            shape = SegmentedButtonDefaults.itemShape(i, 2), enabled = !busy) { Text(label) }
                     }
                 }
 
-                // Card
-                Surface(
-                    Modifier.fillMaxWidth().graphicsLayer { translationX = shake.value * density }
-                        .shadow(24.dp, RoundedCornerShape(28.dp), ambientColor = Color.Black.copy(alpha = 0.2f)),
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.94f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
-                ) {
-                    Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        UpstreamBanner()
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Sign in", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                            Text("Use your AntCloud account.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        SingleChoiceSegmentedButtonRow {
-                            listOf("Email", "Phone").forEachIndexed { i, label ->
-                                SegmentedButton(selected = phoneMode == (i == 1), onClick = { phoneMode = i == 1; error = null; info = null },
-                                    shape = SegmentedButtonDefaults.itemShape(i, 2), enabled = !busy) { Text(label) }
-                            }
-                        }
-
-                        if (!phoneMode) {
-                            OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth(), label = { Text("Email") }, singleLine = true, enabled = !busy,
-                                shape = RoundedCornerShape(14.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next))
-                            OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), label = { Text("Password") }, singleLine = true, enabled = !busy,
-                                shape = RoundedCornerShape(14.dp), visualTransformation = PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
-                                keyboardActions = KeyboardActions(onGo = { if (email.isNotBlank() && password.isNotEmpty()) run { auth.login(email.trim(), password) } }))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                TextButton({ run { auth.forgotPassword(email.trim()); info = "Password reset link sent to ${email.trim()}." } }, enabled = email.isNotBlank() && !busy) {
-                                    Text("Forgot password?")
-                                }
-                            }
-                            GlowButton("Sign In", busy, enabled = email.isNotBlank() && password.isNotEmpty()) { run { auth.login(email.trim(), password) } }
-                        } else {
-                            OutlinedTextField(phone, { phone = it }, Modifier.fillMaxWidth(), label = { Text("Phone number") }, singleLine = true,
-                                enabled = !busy && !otpSent, shape = RoundedCornerShape(14.dp),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
-                            if (otpSent) {
-                                OutlinedTextField(otp, { otp = it }, Modifier.fillMaxWidth(), label = { Text("One-time code") }, singleLine = true, enabled = !busy,
-                                    shape = RoundedCornerShape(14.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                    TextButton({ otpSent = false; otp = ""; info = null }) { Text("Use a different number") }
-                                }
-                                GlowButton("Verify & Sign In", busy, enabled = otp.isNotBlank()) { run { auth.verifyOtp(phone, otp.trim()) } }
-                            } else {
-                                Text("Indian numbers can skip the +91.", Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                GlowButton("Send Code", busy, enabled = phone.isNotBlank()) { run { auth.sendOtp(phone); otpSent = true; info = "Code sent to $phone." } }
-                            }
-                        }
-
-                        AnimatedVisibility(error != null || info != null) {
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                                Icon(if (error != null) AcIcons.AlertCircle else AcIcons.CheckCircle, null, Modifier.padding(top = 2.dp).size(16.dp),
-                                    tint = if (error != null) BadRed else GoodGreen)
-                                Spacer(Modifier.size(8.dp))
-                                Text(error ?: info.orEmpty(), style = MaterialTheme.typography.bodyMedium,
-                                    color = if (error != null) BadRed else MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-
-                        HorizontalDivider()
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("New to AntCloud?", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                            TextButton({ activity.openUrl(Config.SIGNUP_URL) }) { Text("Create an account") }
+                if (!phoneMode) {
+                    OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth().tvEditable(), label = { Text("Email") }, singleLine = true, enabled = !busy,
+                        shape = RoundedCornerShape(14.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next))
+                    OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth().tvEditable(), label = { Text("Password") }, singleLine = true, enabled = !busy,
+                        shape = RoundedCornerShape(14.dp), visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
+                        keyboardActions = KeyboardActions(onGo = { if (email.isNotBlank() && password.isNotEmpty()) run { auth.login(email.trim(), password) } }))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton({ run { auth.forgotPassword(email.trim()); info = "Password reset link sent to ${email.trim()}." } }, enabled = email.isNotBlank() && !busy,
+                        modifier = Modifier.tvFocus(50.dp).heightIn(min = tvOr(52.dp))) {
+                            Text("Forgot password?")
                         }
                     }
+                    GlowButton("Sign In", busy, Modifier.focusRequester(signInFocus), enabled = email.isNotBlank() && password.isNotEmpty()) { run { auth.login(email.trim(), password) } }
+                } else {
+                    OutlinedTextField(phone, { phone = it }, Modifier.fillMaxWidth().tvEditable(), label = { Text("Phone number") }, singleLine = true,
+                        enabled = !busy && !otpSent, shape = RoundedCornerShape(14.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
+                    if (otpSent) {
+                        OutlinedTextField(otp, { otp = it }, Modifier.fillMaxWidth().tvEditable(), label = { Text("One-time code") }, singleLine = true, enabled = !busy,
+                            shape = RoundedCornerShape(14.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton({ otpSent = false; otp = ""; info = null }, Modifier.tvFocus(50.dp).heightIn(min = tvOr(52.dp))) { Text("Use a different number") }
+                        }
+                        GlowButton("Verify & Sign In", busy, Modifier, enabled = otp.isNotBlank()) { run { auth.verifyOtp(phone, otp.trim()) } }
+                    } else {
+                        Text("Indian numbers can skip the +91.", Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        GlowButton("Send Code", busy, Modifier, enabled = phone.isNotBlank()) { run { auth.sendOtp(phone); otpSent = true; info = "Code sent to $phone." } }
+                    }
+                }
+
+                AnimatedVisibility(error != null || info != null) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                        Icon(if (error != null) AcIcons.AlertCircle else AcIcons.CheckCircle, null, Modifier.padding(top = 2.dp).size(16.dp),
+                            tint = if (error != null) BadRed else GoodGreen)
+                        Spacer(Modifier.size(8.dp))
+                        Text(error ?: info.orEmpty(), style = MaterialTheme.typography.bodyMedium,
+                            color = if (error != null) BadRed else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                HorizontalDivider()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("New to AntCloud?", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    TextButton({ activity.openUrl(Config.SIGNUP_URL) }, Modifier.tvFocus(50.dp).heightIn(min = tvOr(52.dp))) { Text("Create an account") }
                 }
             }
         }
     }
+
+    Box(Modifier.fillMaxSize()) {
+        Aurora(dark)
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).safeDrawingPadding().imePadding()
+                .padding(horizontal = if (tv) 48.dp else 20.dp, vertical = if (tv) 27.dp else 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = if (tv) Arrangement.Center else Arrangement.Top,
+        ) {
+            if (tv) Row(Modifier.widthIn(max = 880.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { hero() }
+                Box(Modifier.width(430.dp)) { card() }
+            } else Column(Modifier.widthIn(max = 460.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+                hero()
+                card()
+            }
+        }
+    }
+}
+
+/**
+ * Text fields on a TV. Focusing a field by moving the D-pad would pop up the keyboard, which then swallows the D-pad, so a field
+ * is a normal focus stop (ring, scale) and OK starts editing it: only then does the inner field take focus and open the keyboard.
+ * Moving the D-pad away from it (or closing the keyboard and pressing a direction) ends editing and navigation carries on.
+ */
+@Composable
+private fun Modifier.tvEditable(): Modifier {
+    if (!LocalIsTv.current) return this
+    var editing by remember { mutableStateOf(false) }
+    val inner = remember { FocusRequester() }
+    LaunchedEffect(editing) { if (editing) runCatching { inner.requestFocus() } }
+    return this.tvFocus(14.dp).heightIn(min = 64.dp)
+        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { editing = true }
+        .focusRequester(inner)
+        .focusProperties { canFocus = editing }
+        .onFocusChanged { if (!it.isFocused) editing = false }
 }
 
 @Composable
@@ -209,10 +255,10 @@ private fun Feature(icon: androidx.compose.ui.graphics.vector.ImageVector, text:
 
 /** Brand-gradient pill with a soft blue glow, for the sign-in action. Stays blue when disabled, just dimmer. */
 @Composable
-private fun GlowButton(title: String, busy: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun GlowButton(title: String, busy: Boolean, modifier: Modifier, enabled: Boolean, onClick: () -> Unit) {
     val active = enabled && !busy
     Box(
-        Modifier.fillMaxWidth().height(50.dp).alpha(if (enabled) 1f else 0.45f)
+        modifier.fillMaxWidth().tvFocus(100.dp).height(tvOr(60.dp, 50.dp)).alpha(if (enabled) 1f else 0.45f)
             .shadow(if (enabled) 12.dp else 0.dp, CircleShape, ambientColor = AntBlue, spotColor = AntBlue)
             .clip(CircleShape)
             .background(Brush.linearGradient(listOf(Color(0xFF5C9EFF), AntBlue, Color(0xFF5C5CE6))))

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -83,10 +84,7 @@ fun ControllersPage(header: @Composable () -> Unit = {}) {
     val controller = devices.firstOrNull { it.kind == Diagnostics.Kind.CONTROLLER } ?: devices.firstOrNull { it.kind != Diagnostics.Kind.KEYBOARD }
     val others = devices.filter { it != controller }
 
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+    PageColumn(14.dp, 16.dp, 8.dp) {
         header()
         Column(Modifier.padding(horizontal = 4.dp)) {
             Text("Controller check", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
@@ -103,7 +101,7 @@ fun ControllersPage(header: @Composable () -> Unit = {}) {
                     Text("No controller connected", fontWeight = FontWeight.SemiBold)
                     Text("Turn on your controller and connect it with Bluetooth or a USB cable. It shows up here the moment this device sees it.",
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-                    OutlinedButton({ activity.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }) { Text("Open Bluetooth settings") }
+                    OutlinedButton({ runCatching { activity.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) } }, Modifier.tvFocus(50.dp).heightIn(min = tvOr(52.dp))) { Text("Open Bluetooth settings") }
                 }
             }
         } else {
@@ -145,7 +143,7 @@ fun ControllersPage(header: @Composable () -> Unit = {}) {
                             if (!Diagnostics.vibrate(controller.id)) {
                                 Toast.makeText(activity, "This controller has no vibration Android can use.", Toast.LENGTH_SHORT).show()
                             }
-                        }) {
+                        }, Modifier.tvFocus(50.dp).heightIn(min = tvOr(52.dp))) {
                             Icon(AcIcons.Antenna, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Test vibration")
@@ -179,8 +177,8 @@ fun ControllersPage(header: @Composable () -> Unit = {}) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 HorizontalDivider()
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton({ scope.launch { Diagnostics.share(activity) } }) { Text("Share diagnostics") }
-                    OutlinedButton({ activity.startActivity(Intent(activity, StreamSettings::class.java)) }) { Text("Moonlight settings") }
+                    FilledTonalButton({ scope.launch { Diagnostics.share(activity) } }, Modifier.tvFocus(50.dp).heightIn(min = tvOr(52.dp))) { Text("Share diagnostics") }
+                    OutlinedButton({ activity.startActivity(Intent(activity, StreamSettings::class.java)) }, Modifier.tvFocus(50.dp).heightIn(min = tvOr(52.dp))) { Text("Moonlight settings") }
                 }
                 Text(
                     "If a controller doesn't work in a stream, play with it for a moment, come back here and share diagnostics: " +

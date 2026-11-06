@@ -1,5 +1,28 @@
 package co.antcloud.ui
 
+import android.app.UiModeManager
+import android.content.Context
+import android.content.res.Configuration
+import android.content.pm.PackageManager
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
@@ -46,6 +69,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -401,5 +425,116 @@ fun LatencyScale(value: Double?, modifier: Modifier = Modifier) {
                 lower = zone.upTo
             }
         }
+    }
+}
+
+
+// MARK: Android TV
+
+/** True when the panel runs on an Android TV: set once in [AntCloudActivity]. Phones leave it false and render as before. */
+val LocalIsTv = staticCompositionLocalOf { false }
+
+fun isTelevision(context: Context): Boolean {
+    val ui = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+    val pm = context.packageManager
+    return ui?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+        pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK) || pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
+}
+
+/** Extra space for TV's 10-foot targets: [tv] on a TV, [phone] (default 0) elsewhere. */
+@Composable
+fun tvOr(tv: androidx.compose.ui.unit.Dp, phone: androidx.compose.ui.unit.Dp = 0.dp) = if (LocalIsTv.current) tv else phone
+
+/**
+ * Focus indicator for remote/gamepad navigation: a 3dp AntBlue ring just outside the element (so it also shows on blue
+ * buttons) and a 1.04 scale. Put it first in the modifier chain of anything focusable or clickable. Does nothing off TV.
+ */
+@Composable
+fun Modifier.tvFocus(corner: androidx.compose.ui.unit.Dp = 16.dp): Modifier {
+    if (!LocalIsTv.current) return this
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.04f else 1f, tween(120), label = "tvFocusScale")
+    return this
+        .onFocusChanged { focused = it.hasFocus }
+        .graphicsLayer { scaleX = scale; scaleY = scale }
+        .drawWithContent {
+            drawContent()
+            if (focused) {
+                val grow = 5.dp.toPx()
+                drawRoundRect(AntBlue, Offset(-grow, -grow), Size(size.width + 2 * grow, size.height + 2 * grow),
+                    CornerRadius(corner.toPx() + grow), style = Stroke(3.dp.toPx()))
+            }
+        }
+}
+
+/** A clickable, focusable surface for TV rows and tiles: focus ring, [onClick] on OK / A / Enter. */
+@Composable
+fun Modifier.tvClickable(corner: androidx.compose.ui.unit.Dp = 16.dp, enabled: Boolean = true, onClick: () -> Unit): Modifier =
+    tvFocus(corner).clip(RoundedCornerShape(corner)).clickable(enabled = enabled, onClick = onClick)
+
+/**
+ * A segmented picker. Off TV it is the Material one. On TV the whole row is one focus stop: left/right changes the value,
+ * OK steps to the next one (wrapping), up/down moves on.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun Segments(options: List<Pair<String, String>>, selected: String, locked: Boolean, modifier: Modifier = Modifier, onSelect: (String) -> Unit) {
+    if (!LocalIsTv.current) {
+        androidx.compose.material3.SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
+            options.forEachIndexed { i, (label, value) ->
+                SegmentedButton(selected = value == selected, onClick = { onSelect(value) }, enabled = !locked,
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(i, options.size), icon = {}) { Text(label, maxLines = 1) }
+            }
+        }
+        return
+    }
+    val index = options.indexOfFirst { it.second == selected }
+    fun pick(i: Int) { if (!locked) onSelect(options[i].second) }
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        modifier.fillMaxWidth().tvFocus(14.dp)
+            .onKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown) false
+                else when (e.key) {
+                    Key.DirectionLeft -> if (index > 0) { pick(index - 1); true } else false
+                    Key.DirectionRight -> if (index in 0 until options.lastIndex) { pick(index + 1); true } else false
+                    else -> false
+                }
+            }
+            .clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable { pick((index + 1) % options.size) }
+            .alpha(if (locked) 0.5f else 1f),
+    ) {
+        options.forEachIndexed { i, (label, _) ->
+            val on = i == index
+            Box(
+                Modifier.weight(1f).heightIn(min = 52.dp).padding(3.dp).clip(RoundedCornerShape(11.dp))
+                    .background(if (on) AntBlue else Color.Transparent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(label, maxLines = 1, color = if (on) Color.White else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, textAlign = TextAlign.Center)
+            }
+        }
+    }
+}
+
+/**
+ * A scrolling page. Phones: full width with the given padding, as before. TV: a centred column at most 840dp wide, so rows
+ * and cards don't stretch across a 1080p screen; focus scrolls it.
+ */
+@Composable
+fun PageColumn(
+    spacing: androidx.compose.ui.unit.Dp, horizontal: androidx.compose.ui.unit.Dp, vertical: androidx.compose.ui.unit.Dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    if (LocalIsTv.current) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Column(Modifier.widthIn(max = 868.dp).fillMaxWidth().fillMaxHeight().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(spacing), content = content)
+        }
+    } else {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = horizontal, vertical = vertical),
+            verticalArrangement = Arrangement.spacedBy(spacing), content = content)
     }
 }

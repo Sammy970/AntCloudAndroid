@@ -22,7 +22,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -46,6 +55,12 @@ import java.time.OffsetDateTime
 class AntCloudActivity : ComponentActivity() {
     private lateinit var bridge: MoonlightBridge
     private var restored = false
+    private val tv by lazy { isTelevision(this) }
+
+    private companion object {
+        val NAV_KEYS = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ENTER)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,8 +77,16 @@ class AntCloudActivity : ComponentActivity() {
         }
 
         setContent {
-            AntCloudTheme(dark = intent.getStringExtra("theme")?.let { it == "dark" } ?: isSystemInDarkTheme()) {
-                Root(bridge, initialTab = preview?.split(":")?.getOrNull(2))
+            // On a TV, text is read from the sofa: every sp is 1.3x, and the layouts switch to the 10-foot versions.
+            val density = LocalDensity.current
+            val isTv = tv
+            CompositionLocalProvider(
+                LocalIsTv provides isTv,
+                LocalDensity provides if (isTv) Density(density.density, density.fontScale * 1.3f) else density,
+            ) {
+                AntCloudTheme(dark = intent.getStringExtra("theme")?.let { it == "dark" } ?: isSystemInDarkTheme()) {
+                    Root(bridge, initialTab = preview?.split(":")?.getOrNull(2))
+                }
             }
         }
     }
@@ -76,8 +99,22 @@ class AntCloudActivity : ComponentActivity() {
     }
 
     // The controller test (Stream → Controllers) sees input before Compose does, and keeps controller buttons.
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-        Diagnostics.onKey(event) || super.dispatchKeyEvent(event)
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val navigation = tv && event.keyCode in NAV_KEYS
+        // On a TV the controller check must not trap a gamepad: D-pad, A and B still navigate while it records them.
+        if (navigation) {
+            Diagnostics.onKey(event)
+            return super.dispatchKeyEvent(remapGamepad(event))
+        }
+        return Diagnostics.onKey(event) || super.dispatchKeyEvent(event)
+    }
+
+    /** Gamepad A is OK and B is Back for the panel; Compose and the framework only know DPAD_CENTER, ENTER and BACK. */
+    private fun remapGamepad(event: KeyEvent): KeyEvent = when (event.keyCode) {
+        KeyEvent.KEYCODE_BUTTON_A -> KeyEvent(event.downTime, event.eventTime, event.action, KeyEvent.KEYCODE_DPAD_CENTER, event.repeatCount, event.metaState, event.deviceId, event.scanCode, event.flags, event.source)
+        KeyEvent.KEYCODE_BUTTON_B -> KeyEvent(event.downTime, event.eventTime, event.action, KeyEvent.KEYCODE_BACK, event.repeatCount, event.metaState, event.deviceId, event.scanCode, event.flags, event.source)
+        else -> event
+    }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         Diagnostics.onMotion(event)
@@ -121,8 +158,10 @@ private fun Root(bridge: MoonlightBridge, initialTab: String?) {
     val state by AppState.auth.state.collectAsState()
     val notice by AppState.session.notice.collectAsState()
 
+    val tv = LocalIsTv.current
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Crossfade(state, label = "root") { s ->
+        // Overscan-safe margins on a TV (5% of 1920x1080, in dp at 2x: 48 x 27); Login draws its background edge to edge.
+        Crossfade(state, Modifier.then(if (tv && state == AuthStore.State.LOGGED_IN) Modifier.padding(horizontal = 48.dp, vertical = 27.dp) else Modifier), label = "root") { s ->
             when (s) {
                 AuthStore.State.RESTORING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -137,9 +176,11 @@ private fun Root(bridge: MoonlightBridge, initialTab: String?) {
     }
 
     notice?.let { n ->
+        val ok = remember { FocusRequester() }
+        if (tv) LaunchedEffect(Unit) { runCatching { ok.requestFocus() } }
         AlertDialog(
             onDismissRequest = { AppState.session.dismissNotice() },
-            confirmButton = { TextButton({ AppState.session.dismissNotice() }) { Text("OK") } },
+            confirmButton = { TextButton({ AppState.session.dismissNotice() }, Modifier.focusRequester(ok).tvFocus(50.dp).heightIn(min = tvOr(52.dp))) { Text("OK") } },
             title = { Text(n.title) },
             text = { Text(n.message) },
         )
