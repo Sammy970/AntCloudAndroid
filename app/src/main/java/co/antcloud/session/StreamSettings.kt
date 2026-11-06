@@ -27,6 +27,7 @@ data class StreamSettings(
     val bitrate: String = "20000",
     val aspect: AspectRatio = AspectRatio.WIDE,
     val hevc: Boolean = true,
+    val stretch: Boolean = false,
 ) {
     /** "<res> <bitrate> <fps> 10 <aspect>" — sent as the socket `stream` query and with `setstream`. */
     val serverSpec get() = "$resolution $bitrate $fps 10 ${aspect.serverCode}"
@@ -57,13 +58,15 @@ data class StreamSettings(
             .putInt("seekbar_bitrate_kbps", bitrate.toIntOrNull() ?: 20000)
             // "auto" picks HEVC when the phone decodes it well; off means H.264 only.
             .putString("video_format", if (hevc) "auto" else "neverh265")
+            // Moonlight's own "Stretch video to full-screen": the surface fills the view, so touch maps over all of it.
+            .putBoolean("checkbox_stretch_video", stretch)
             .apply()
     }
 
     fun save() {
         AntCloud.prefs.edit().putString(KEY, JSONObject()
             .put("resolution", resolution).put("fps", fps).put("bitrate", bitrate)
-            .put("aspect", aspect.name).put("hevc", hevc).toString()).apply()
+            .put("aspect", aspect.name).put("hevc", hevc).put("stretch", stretch).toString()).apply()
     }
 
     companion object {
@@ -77,6 +80,7 @@ data class StreamSettings(
                 bitrate = json.optString("bitrate", "20000"),
                 aspect = AspectRatio.valueOf(json.optString("aspect", "WIDE")),
                 hevc = json.optBoolean("hevc", true),
+                stretch = json.optBoolean("stretch", false),
             )
         }.getOrDefault(StreamSettings())
     }

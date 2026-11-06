@@ -334,6 +334,8 @@ private fun StreamPage() {
             Spacer(Modifier.height(16.dp))
             Label("Aspect ratio")
             Segments(AspectRatio.entries.map { it.label to it.name }, settings.aspect.name, locked) { v -> update { it.copy(aspect = AspectRatio.valueOf(v)) } }
+            Spacer(Modifier.height(8.dp))
+            ToggleRow("Stretch to fill screen", "Removes the black bars at the sides. The picture looks a little wider than it is.", settings.stretch, locked) { v -> update { it.copy(stretch = v) } }
         }
 
         Section("Performance", "Uses up to ${settings.gigabytesPerHour} GB of data per hour. Lower the bitrate if the picture stutters.")
