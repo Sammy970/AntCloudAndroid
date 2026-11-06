@@ -158,6 +158,40 @@ a small pill at the top, the controls themselves in the clear, and a faint blue 
   </tr>
 </table>
 
+### Turn the gamepad off during a stream
+
+<p align="center">
+  <img src=".github/screenshots/gamepad-button-try-it.png" width="100%" alt="The layout editor in Try it mode: a round gamepad button at the bottom right, next to where the keyboard button sits in a stream">
+  <br><sub>The gamepad button in Try it mode.</sub>
+</p>
+
+A round button next to the keyboard button turns the on-screen controls off and on for that stream. With floating sticks on, every touch becomes a stick, so switch the controls off to move the mouse or touch pointer, then back on when you need them.
+
+- **Off** releases everything that is held, hides the controls and sends your touches to Moonlight's normal pointer and touch handling.
+- **On** brings the controls back exactly as you set them. Your saved settings never change, and a physical controller works either way.
+- The button stays hidden if your on-screen controls are off, and on a TV.
+- In the layout editor's **Try it** mode the button is shown too, so you can see where it sits. Tapping it there only explains what it does.
+
+## On Android TV
+
+AntCloud has a layout made for a TV (version 0.16.9 and later), so you can start the cloud PC from the couch.
+
+<table>
+  <tr>
+    <td width="50%"><img src=".github/screenshots/tv-home-row.png" width="100%" alt="An Android TV home screen with AntCloud under Installed Games, with its own banner"><br><sub>On the TV's home row, with its own banner.</sub></td>
+    <td width="50%"><img src=".github/screenshots/tv-home.png" width="100%" alt="The Cloud PC screen on a TV in two columns: the monitor and plan card on the left, the status, steps and a Launch Stream button with a blue outline on the right"><br><sub>Two columns, with a clear outline on the selected button.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src=".github/screenshots/tv-stream-settings.png" width="100%" alt="Stream settings on a TV with one row outlined in blue"><br><sub>Every setting works with the arrow keys.</sub></td>
+    <td width="50%"><img src=".github/screenshots/tv-login.png" width="100%" alt="The sign-in screen on a TV, with the hero on the left and the sign-in card on the right"><br><sub>Sign-in, with the fields opening the TV keyboard.</sub></td>
+  </tr>
+</table>
+
+- **Remote and gamepad navigation:** arrow keys and OK, a blue outline on the selected item, Back closes dialogs and returns to Cloud PC, and left and right change a picker.
+- **Made for a TV screen:** larger text and buttons, margins that keep everything on screen, and a tab bar along the top.
+- **Only what works on a TV:** the touch-only settings (on-screen controls, the layout editor) and the keyboard and gamepad buttons in the stream are hidden. The controller check stays.
+- It has been tested on an Android TV emulator, not yet on a real TV. Tell us on [Discord](https://discord.gg/GVDYtpWHps) what still looks off.
+
 ## Features
 
 - **Sign in** with email and password or a phone code. The refresh token is encrypted with a key that stays in the Android Keystore.
@@ -174,6 +208,9 @@ a small pill at the top, the controls themselves in the clear, and a faint blue 
   log, and Moonlight's own controller settings are one tap away.
 - **Glass on-screen controls** you can move, resize, remove and fade, with floating sticks that appear under your thumb and a Try it mode.
 - **A Controls tab of its own:** floating sticks, fade when idle, the layout editor and the controller check, apart from the stream settings.
+- **A gamepad button in the stream** that turns the on-screen controls off and on, so you can move the pointer while floating sticks are on (below).
+- **Stretch to fill screen:** removes the black bars at the sides. The picture looks a little wider than it is.
+- **Android TV:** a TV layout with remote and gamepad navigation, and its own banner on the TV home row (below).
 - **Motion with a purpose:** the monitor powers on, the track fills step by step, and a failed sign-in shakes.
 
 ## Download
