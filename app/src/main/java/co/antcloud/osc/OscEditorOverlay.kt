@@ -16,9 +16,13 @@ import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
+import android.widget.ImageButton
 import android.widget.SeekBar
+import android.widget.Toast
 import android.widget.TextView
+import com.limelight.R
 import com.limelight.binding.input.virtual_controller.VirtualController
+import com.limelight.preferences.PreferenceConfiguration
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.min
@@ -41,6 +45,22 @@ class OscEditorOverlay(
     private val layout get() = controller.layout
     private var selected: OscElement? = null
     private var trying = false
+
+    /** Demo of the stream's gamepad toggle (same look and spot), shown only in Try it and only when on-screen controls are enabled. Tapping it never turns anything off. */
+    private val demoButton = ImageButton(context).apply {
+        val pad = (10 * d).toInt()
+        setPadding(pad, pad, pad, pad)
+        alpha = 0.7f
+        setImageResource(R.drawable.antcloud_gamepad)
+        setBackgroundResource(R.drawable.antcloud_keyboard_background)
+        contentDescription = "Gamepad button demo"
+        isFocusable = false
+        visibility = GONE
+        setOnClickListener {
+            Toast.makeText(context, "In a stream, this turns the on-screen controls off so you can use the mouse.", Toast.LENGTH_LONG).show()
+        }
+    }
+    private val oscEnabled = PreferenceConfiguration.readPreferences(context).onscreenController
 
     private var dragging: OscElement? = null
     private var dragPointer = -1
@@ -314,6 +334,7 @@ class OscEditorOverlay(
         setBinHot(false)
         if (on) showOptions(false)
         controller.setArranging(!on)
+        demoButton.visibility = if (on && oscEnabled) VISIBLE else GONE
         refreshPanel()
         showHint()
         invalidate()
@@ -442,6 +463,7 @@ class OscEditorOverlay(
             addView(chipScroll, LinearLayout.LayoutParams(0, (34 * d).toInt()))
         }
         addView(tray, LayoutParams(LayoutParams.WRAP_CONTENT, (42 * d).toInt(), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
+        addView(demoButton, LayoutParams((44 * d).toInt(), (44 * d).toInt(), Gravity.BOTTOM or Gravity.END))
     }
 
     /** Puts the chrome at the screen edges, clear of the notch and the rounded corners. */
@@ -455,6 +477,7 @@ class OscEditorOverlay(
         (optionsCard.layoutParams as LayoutParams).apply { topMargin = top + (52 * d).toInt(); rightMargin = side }
         (hint.layoutParams as LayoutParams).topMargin = top + (50 * d).toInt()
         (tray.layoutParams as LayoutParams).bottomMargin = bottom
+        (demoButton.layoutParams as LayoutParams).apply { bottomMargin = bottom + (8 * d).toInt(); rightMargin = side + (60 * d).toInt() }
         requestLayout()
     }
 

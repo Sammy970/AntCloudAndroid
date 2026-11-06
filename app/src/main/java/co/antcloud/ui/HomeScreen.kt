@@ -418,6 +418,7 @@ private fun OnScreenControlsSection() {
             OscStore.save(context, layout)
         }
     }
+    Text("During a stream, the gamepad button next to the keyboard button turns these controls off for that stream. Your saved settings don't change.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp))
     Card(Modifier.clickable { context.startActivity(Intent(context, OscEditorActivity::class.java)) }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(AcIcons.Gamepad, null, Modifier.size(20.dp), tint = AntBlue)
