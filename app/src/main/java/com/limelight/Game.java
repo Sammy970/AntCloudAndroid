@@ -75,6 +75,7 @@ import android.view.View.OnTouchListener;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -112,6 +113,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private ControllerHandler controllerHandler;
     private KeyboardTranslator keyboardTranslator;
     private VirtualController virtualController;
+    private ImageButton antcloudOscButton;
 
     private PreferenceConfiguration prefConfig;
     private SharedPreferences tombstonePrefs;
@@ -274,6 +276,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // AntCloud: an on-screen button for the soft keyboard, since a three-finger tap is hard to discover.
         findViewById(R.id.antcloudKeyboardButton).setOnClickListener(v -> toggleKeyboard());
+
+        // AntCloud: sibling button that turns the on-screen controls off/on for this stream (so the mouse/touch
+        // pointer works while floating sticks are on). Shown only when on-screen controls are in use.
+        antcloudOscButton = (ImageButton) findViewById(R.id.antcloudOscButton);
+        if (prefConfig.onscreenController) {
+            antcloudOscButton.setOnClickListener(v -> toggleOnScreenControls());
+        } else {
+            antcloudOscButton.setVisibility(View.GONE);
+        }
 
         inputCaptureProvider = InputCaptureManager.getInputCaptureProvider(this, this);
 
@@ -1498,6 +1509,21 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         else {
             return null;
         }
+    }
+
+    private void toggleOnScreenControls() {
+        if (virtualController == null) {
+            return;
+        }
+        boolean off = !virtualController.isUserOff();
+        virtualController.setUserOff(off);
+        if (virtualController.isUserOff() != off) {
+            return; // refused (the editor is open)
+        }
+        antcloudOscButton.setImageResource(off ? R.drawable.antcloud_gamepad_off : R.drawable.antcloud_gamepad);
+        antcloudOscButton.setAlpha(off ? 0.45f : 0.7f);
+        antcloudOscButton.setContentDescription(off ? "Turn on-screen controls on" : "Turn on-screen controls off");
+        Toast.makeText(this, off ? "On-screen controls off" : "On-screen controls on", Toast.LENGTH_SHORT).show();
     }
 
     @Override

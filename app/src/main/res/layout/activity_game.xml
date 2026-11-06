@@ -66,4 +66,21 @@
         android:focusableInTouchMode="false"
         android:preferKeepClear="true" />
 
+    <!-- AntCloud: turns the on-screen gamepad off/on for this stream. Sits left of the keyboard button. -->
+    <ImageButton
+        android:id="@+id/antcloudOscButton"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginBottom="16dp"
+        android:layout_marginEnd="72dp"
+        android:padding="10dp"
+        android:alpha="0.7"
+        android:src="@drawable/antcloud_gamepad"
+        android:background="@drawable/antcloud_keyboard_background"
+        android:contentDescription="Turn on-screen controls off"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
+        android:preferKeepClear="true" />
+
 </merge>

@@ -76,6 +76,8 @@ public class VirtualController {
     private static final long FADE_OUT_MS = 400, FADE_IN_MS = 150;
     private final FloatingSticks floating;
     private boolean hidden = false;
+    // AntCloud: the in-stream gamepad button switched the on-screen controls off (this stream only, never saved)
+    private boolean userOff = false;
     private boolean faded = false;
     private boolean idlePosted = false;
     private boolean streamHeld = false;
@@ -162,8 +164,49 @@ public class VirtualController {
         relayout();
 
         buttonConfigure.setAlpha(0.25f);
-        buttonConfigure.setVisibility(editor == null ? View.VISIBLE : View.GONE);
+        buttonConfigure.setVisibility(userOff ? View.INVISIBLE : (editor == null ? View.VISIBLE : View.GONE));
         restartIdle();
+    }
+
+    public boolean isUserOff() {
+        return userOff;
+    }
+
+    private void applyUserOffVisibility() {
+        for (VirtualControllerElement element : elements) {
+            element.animate().cancel();
+            element.setVisibility(View.INVISIBLE);
+        }
+        buttonConfigure.animate().cancel();
+        buttonConfigure.setVisibility(View.INVISIBLE);
+    }
+
+    /**
+     * AntCloud: the in-stream gamepad button. Off: anything held is released (a neutral state goes to the PC),
+     * the controls are hidden and no touch reaches them or the floating-stick layer, so the stream's own touch
+     * and mouse handling gets every touch. On: the configured behaviour comes back as it was. Never saved.
+     */
+    public void setUserOff(boolean off) {
+        if (off == userOff || editor != null) {
+            return;
+        }
+        if (off) {
+            floating.releaseAll(false);
+            inputContext = new ControllerInputContext();
+            handler.removeCallbacks(delayedRetransmitRunnable);
+            sendControllerInputContext(); // still on: sends the neutral state (and its retransmits)
+            userOff = true;
+            cancelIdle();
+            faded = false;
+            applyUserOffVisibility();
+        } else {
+            userOff = false;
+            inputContext = new ControllerInputContext();
+            if (!hidden) {
+                refreshLayout();
+                show();
+            }
+        }
     }
 
     public void removeElements() {
@@ -231,6 +274,9 @@ public class VirtualController {
             floating.releaseAll(false);
         }
         OscGeometry.apply(this, frame_layout, w, h, layout, arranging);
+        if (userOff) {
+            applyUserOffVisibility();
+        }
         if (editor != null) {
             editor.invalidate();
         }
@@ -337,7 +383,7 @@ public class VirtualController {
 
     /** True while touches on empty screen spawn floating sticks (the fixed sticks are hidden then). */
     public boolean isFloatingActive() {
-        return layout.getFloatingSticks() && !arranging && !hidden;
+        return layout.getFloatingSticks() && !arranging && !hidden && !userOff;
     }
 
     /** True while a floating stick (by element id) is out or fading, so the layout leaves its view alone. */
@@ -370,7 +416,7 @@ public class VirtualController {
 
     private boolean canFade() {
         // Not while arranging (the editor shows everything at full strength); "Try it" does fade, like the stream
-        return layout.getFadeAfter() > 0 && !arranging && !hidden && !elements.isEmpty();
+        return layout.getFadeAfter() > 0 && !arranging && !hidden && !userOff && !elements.isEmpty();
     }
 
     private boolean isTouchHeld() {
@@ -451,6 +497,9 @@ public class VirtualController {
     }
 
     void sendControllerInputContext() {
+        if (userOff) {
+            return;
+        }
         // Cancel retransmissions of prior gamepad inputs
         handler.removeCallbacks(delayedRetransmitRunnable);
 
