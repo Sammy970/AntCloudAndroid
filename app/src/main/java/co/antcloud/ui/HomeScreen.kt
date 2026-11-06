@@ -644,6 +644,8 @@ private fun AboutPage() {
             }
         }
 
+        DiscordCard { activity.openUrl(Config.DISCORD_INVITE) }
+
         Card(Modifier.widthIn(max = tvOr(640.dp, 460.dp)).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(64.dp).clip(CircleShape)) {
@@ -675,6 +677,22 @@ private fun AboutPage() {
         Text("Unofficial. Not made, endorsed or supported by AntCloud.\n\"AntCloud\" and its logo belong to their owners.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+/** "Join our Discord": a blurple button with a one-line caption; focusable and OK/Enter-operable on TV. */
+@Composable
+private fun DiscordCard(onClick: () -> Unit) {
+    Column(Modifier.widthIn(max = tvOr(640.dp, 460.dp)).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().tvFocus(14.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF5865F2)).clickable(onClick = onClick).heightIn(min = tvOr(60.dp, 52.dp)).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            Icon(AcIcons.Link, null, Modifier.size(18.dp), tint = Color.White)
+            Spacer(Modifier.width(10.dp))
+            Text("Join our Discord", color = Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.width(8.dp))
+            Icon(AcIcons.ArrowUpRight, null, Modifier.size(12.dp), tint = Color.White)
+        }
+        Text("Questions, bugs or ideas? Come and chat.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
 

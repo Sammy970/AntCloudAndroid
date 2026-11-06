@@ -35,6 +35,7 @@ object Config {
     const val CREATOR_NAME = "Samyak Jain"
     const val CREATOR_GITHUB = "https://github.com/Sammy970"
     const val CREATOR_X = "https://x.com/Sammy_970"
+    const val DISCORD_INVITE = "https://discord.gg/GVDYtpWHps"
     const val CREATOR_AVATAR = "https://github.com/Sammy970.png?size=240"
     const val MOONLIGHT_URL = "https://moonlight-stream.org"
     const val SOURCE_URL = "https://github.com/Sammy970/AntCloudAndroid"
