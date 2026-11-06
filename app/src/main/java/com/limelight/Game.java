@@ -275,12 +275,19 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         performanceOverlayView = findViewById(R.id.performanceOverlay);
 
         // AntCloud: an on-screen button for the soft keyboard, since a three-finger tap is hard to discover.
-        findViewById(R.id.antcloudKeyboardButton).setOnClickListener(v -> toggleKeyboard());
+        // AntCloud: a TV has no touchscreen, so both on-screen buttons are hidden there (a remote can't tap them).
+        boolean antcloudTv = getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEVISION) ||
+                getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK);
+        View antcloudKeyboardButton = findViewById(R.id.antcloudKeyboardButton);
+        antcloudKeyboardButton.setOnClickListener(v -> toggleKeyboard());
+        if (antcloudTv) {
+            antcloudKeyboardButton.setVisibility(View.GONE);
+        }
 
         // AntCloud: sibling button that turns the on-screen controls off/on for this stream (so the mouse/touch
         // pointer works while floating sticks are on). Shown only when on-screen controls are in use.
         antcloudOscButton = (ImageButton) findViewById(R.id.antcloudOscButton);
-        if (prefConfig.onscreenController) {
+        if (prefConfig.onscreenController && !antcloudTv) {
             antcloudOscButton.setOnClickListener(v -> toggleOnScreenControls());
         } else {
             antcloudOscButton.setVisibility(View.GONE);
